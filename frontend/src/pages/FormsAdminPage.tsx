@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
@@ -8,6 +9,7 @@ import {
   Container,
   Divider,
   Paper,
+  Snackbar,
   Stack,
   Typography,
   alpha,
@@ -31,6 +33,7 @@ const statePresentation: Record<FormState, { label: string; color: string }> = {
 export function FormsAdminPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [shareMessage, setShareMessage] = useState<string | null>(null)
   const session = useQuery({
     queryKey: ['auth', 'session'],
     queryFn: async () => (await getAuthSession()).data ?? null,
@@ -76,6 +79,16 @@ export function FormsAdminPage() {
   const removeForm = (formId: number, title: string) => {
     if (window.confirm(`Excluir o formulário "${title}"?`)) {
       deleteMutation.mutate(formId)
+    }
+  }
+
+  const shareForm = async (slug: string) => {
+    const url = new URL(`/forms/${slug}`, window.location.origin).toString()
+    try {
+      await navigator.clipboard.writeText(url)
+      setShareMessage('URL copiada para a área de transferência.')
+    } catch {
+      setShareMessage('Não foi possível copiar a URL.')
     }
   }
 
@@ -305,6 +318,15 @@ export function FormsAdminPage() {
                             Ver respostas
                           </Button>
                           <Button
+                            onClick={() => void shareForm(form.slug)}
+                            variant="outlined"
+                            aria-label={`Compartilhar ${form.title}`}
+                            title="Copiar URL pública"
+                            sx={{ minWidth: 44, px: 1.25, fontSize: 19, lineHeight: 1 }}
+                          >
+                            📋
+                          </Button>
+                          <Button
                             color="error"
                             disabled={deleteMutation.isPending}
                             onClick={() => removeForm(form.id, form.title)}
@@ -325,6 +347,12 @@ export function FormsAdminPage() {
           )}
         </Stack>
       </Container>
+      <Snackbar
+        autoHideDuration={3500}
+        message={shareMessage}
+        onClose={() => setShareMessage(null)}
+        open={Boolean(shareMessage)}
+      />
     </Box>
   )
 }
