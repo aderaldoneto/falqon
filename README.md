@@ -44,4 +44,26 @@ docker compose exec api sh -c 'goose -dir ./migrations postgres "$DATABASE_URL" 
 docker compose exec api sh -c 'goose -dir ./migrations postgres "$DATABASE_URL" down'
 ```
 
-As migrations ficam em `backend/migrations`. 
+As migrations ficam em `backend/migrations`.
+
+## Dados iniciais
+
+Depois de aplicar as migrations, crie ou atualize o usuario administrador de
+desenvolvimento:
+
+```bash
+docker compose exec db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /seeds/admin.sql'
+```
+
+Em ambientes com Make, o atalho equivalente e:
+
+```bash
+make seed
+```
+
+Credenciais locais:
+
+```text
+E-mail: user@falqon.com.br
+Senha: 123456
+```
