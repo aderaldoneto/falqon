@@ -257,6 +257,11 @@ type CreateFormParams struct {
 	FalqonSession *string `form:"falqon_session,omitempty" json:"falqon_session,omitempty"`
 }
 
+// DeleteFormParams defines parameters for DeleteForm.
+type DeleteFormParams struct {
+	FalqonSession *string `form:"falqon_session,omitempty" json:"falqon_session,omitempty"`
+}
+
 // GetFormParams defines parameters for GetForm.
 type GetFormParams struct {
 	FalqonSession *string `form:"falqon_session,omitempty" json:"falqon_session,omitempty"`
@@ -315,6 +320,9 @@ type ServerInterface interface {
 	// CreateForm Cria um formulario dinamico como rascunho
 	// (POST /admin/forms)
 	CreateForm(w http.ResponseWriter, r *http.Request, params CreateFormParams)
+	// DeleteForm Exclui logicamente um formulario do usuario autenticado
+	// (DELETE /admin/forms/{formId})
+	DeleteForm(w http.ResponseWriter, r *http.Request, formId int64, params DeleteFormParams)
 	// GetForm Busca um formulario do usuario autenticado para edicao
 	// (GET /admin/forms/{formId})
 	GetForm(w http.ResponseWriter, r *http.Request, formId int64, params GetFormParams)
@@ -369,6 +377,12 @@ func (_ Unimplemented) ListForms(w http.ResponseWriter, r *http.Request, params 
 // CreateForm Cria um formulario dinamico como rascunho
 // (POST /admin/forms)
 func (_ Unimplemented) CreateForm(w http.ResponseWriter, r *http.Request, params CreateFormParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteForm Exclui logicamente um formulario do usuario autenticado
+// (DELETE /admin/forms/{formId})
+func (_ Unimplemented) DeleteForm(w http.ResponseWriter, r *http.Request, formId int64, params DeleteFormParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -520,6 +534,50 @@ func (siw *ServerInterfaceWrapper) CreateForm(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateForm(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteForm operation middleware
+func (siw *ServerInterfaceWrapper) DeleteForm(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "formId" -------------
+	var formId int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "formId", chi.URLParam(r, "formId"), &formId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "formId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteFormParams
+
+	{
+		var cookie *http.Cookie
+
+		if cookie, err = r.Cookie("falqon_session"); err == nil {
+			var value string
+			err = runtime.BindStyledParameterWithOptions("simple", "falqon_session", cookie.Value, &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationCookie, Explode: true, Required: false, Type: "string", Format: ""})
+			if err != nil {
+				siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "falqon_session", Err: err})
+				return
+			}
+			params.FalqonSession = &value
+
+		}
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteForm(w, r, formId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1104,6 +1162,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/admin/forms", wrapper.CreateForm)
 	})
 	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/admin/forms/{formId}", wrapper.DeleteForm)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/admin/forms/{formId}", wrapper.GetForm)
 	})
 	r.Group(func(r chi.Router) {
@@ -1216,6 +1277,51 @@ func (response CreateForm422JSONResponse) VisitCreateFormResponse(w http.Respons
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFormRequestObject struct {
+	FormId int64 `json:"formId"`
+	Params DeleteFormParams
+}
+
+type DeleteFormResponseObject interface {
+	VisitDeleteFormResponse(w http.ResponseWriter) error
+}
+
+type DeleteForm204Response struct {
+}
+
+func (response DeleteForm204Response) VisitDeleteFormResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteForm401JSONResponse ErrorResponse
+
+func (response DeleteForm401JSONResponse) VisitDeleteFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteForm404JSONResponse ErrorResponse
+
+func (response DeleteForm404JSONResponse) VisitDeleteFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1809,6 +1915,9 @@ type StrictServerInterface interface {
 	// CreateForm Cria um formulario dinamico como rascunho
 	// (POST /admin/forms)
 	CreateForm(ctx context.Context, request CreateFormRequestObject) (CreateFormResponseObject, error)
+	// DeleteForm Exclui logicamente um formulario do usuario autenticado
+	// (DELETE /admin/forms/{formId})
+	DeleteForm(ctx context.Context, request DeleteFormRequestObject) (DeleteFormResponseObject, error)
 	// GetForm Busca um formulario do usuario autenticado para edicao
 	// (GET /admin/forms/{formId})
 	GetForm(ctx context.Context, request GetFormRequestObject) (GetFormResponseObject, error)
@@ -1941,6 +2050,33 @@ func (sh *strictHandler) CreateForm(w http.ResponseWriter, r *http.Request, para
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateFormResponseObject); ok {
 		if err := validResponse.VisitCreateFormResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteForm operation middleware
+func (sh *strictHandler) DeleteForm(w http.ResponseWriter, r *http.Request, formId int64, params DeleteFormParams) {
+	var request DeleteFormRequestObject
+
+	request.FormId = formId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteForm(ctx, request.(DeleteFormRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteForm")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteFormResponseObject); ok {
+		if err := validResponse.VisitDeleteFormResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2308,47 +2444,47 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"GQAA//8=",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

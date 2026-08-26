@@ -13,6 +13,9 @@ import type {
   CreateSubmissionData,
   CreateSubmissionErrors,
   CreateSubmissionResponses,
+  DeleteFormData,
+  DeleteFormErrors,
+  DeleteFormResponses,
   GetAuthSessionData,
   GetAuthSessionErrors,
   GetAuthSessionResponses,
@@ -248,6 +251,28 @@ export const createForm = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * Exclui logicamente um formulario do usuario autenticado
+ */
+export const deleteForm = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteFormData, ThrowOnError>,
+) =>
+  (options.client ?? client).delete<
+    DeleteFormResponses,
+    DeleteFormErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: "cookie",
+        name: "falqon_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/admin/forms/{formId}",
+    ...options,
   });
 
 /**

@@ -434,6 +434,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteForm
+      summary: Exclui logicamente um formulario do usuario autenticado
+      tags:
+        - Forms
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: falqon_session
+          in: cookie
+          required: false
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Formulario excluido logicamente
+        "401":
+          description: Sessao ausente ou expirada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Formulario nao encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /admin/forms/{formId}/publish:
     post:
       operationId: publishForm

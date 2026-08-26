@@ -47,6 +47,7 @@ type formRepository interface {
 	ListPublished(context.Context) ([]formdomain.Summary, error)
 	FindByOwner(context.Context, int64, int64) (formdomain.PublicForm, error)
 	Update(context.Context, int64, int64, string, string, *string, []formdomain.FieldDefinition) (formdomain.Summary, error)
+	Delete(context.Context, int64, int64) error
 	Publish(context.Context, int64, int64) (formdomain.Summary, error)
 	FindPublishedBySlug(context.Context, string) (formdomain.PublicForm, error)
 	CreateSubmission(context.Context, int64, []formdomain.Answer) (formdomain.Submission, error)
@@ -456,6 +457,25 @@ func (server *Server) UpdateForm(ctx context.Context, request UpdateFormRequestO
 		return nil, err
 	}
 	return UpdateForm200JSONResponse(formSummaryResponse(form)), nil
+}
+
+func (server *Server) DeleteForm(ctx context.Context, request DeleteFormRequestObject) (DeleteFormResponseObject, error) {
+	if request.Params.FalqonSession == nil {
+		return DeleteForm401JSONResponse{Code: "unauthenticated", Message: "authentication is required"}, nil
+	}
+	user, err := server.authRepository.UserBySession(ctx, *request.Params.FalqonSession)
+	if errors.Is(err, formauth.ErrUnauthenticated) {
+		return DeleteForm401JSONResponse{Code: "unauthenticated", Message: "authentication is required"}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := server.formRepository.Delete(ctx, request.FormId, user.ID); errors.Is(err, formdomain.ErrFormNotFound) {
+		return DeleteForm404JSONResponse{Code: "form_not_found", Message: "form was not found"}, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return DeleteForm204Response{}, nil
 }
 
 func (server *Server) PublishForm(

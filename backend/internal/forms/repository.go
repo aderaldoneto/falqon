@@ -301,6 +301,21 @@ func (repository *Repository) Update(
 	return form, nil
 }
 
+func (repository *Repository) Delete(ctx context.Context, formID, ownerID int64) error {
+	result, err := repository.database.Exec(ctx, `
+		UPDATE forms
+		SET deleted_at = NOW(), deleted_by = $2, updated_by = $2, updated_at = NOW()
+		WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL
+	`, formID, ownerID)
+	if err != nil {
+		return fmt.Errorf("delete form: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return ErrFormNotFound
+	}
+	return nil
+}
+
 func (repository *Repository) FindPublishedBySlug(ctx context.Context, slug string) (PublicForm, error) {
 	var form PublicForm
 	err := repository.database.QueryRow(ctx, `

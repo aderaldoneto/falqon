@@ -418,6 +418,37 @@ export type CreateFormResponses = {
 
 export type CreateFormResponse = CreateFormResponses[keyof CreateFormResponses];
 
+export type DeleteFormData = {
+  body?: never;
+  path: {
+    formId: number;
+  };
+  query?: never;
+  url: "/admin/forms/{formId}";
+};
+
+export type DeleteFormErrors = {
+  /**
+   * Sessao ausente ou expirada
+   */
+  401: ErrorResponse;
+  /**
+   * Formulario nao encontrado
+   */
+  404: ErrorResponse;
+};
+
+export type DeleteFormError = DeleteFormErrors[keyof DeleteFormErrors];
+
+export type DeleteFormResponses = {
+  /**
+   * Formulario excluido logicamente
+   */
+  204: void;
+};
+
+export type DeleteFormResponse = DeleteFormResponses[keyof DeleteFormResponses];
+
 export type GetFormData = {
   body?: never;
   path: {

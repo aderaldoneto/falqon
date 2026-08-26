@@ -13,7 +13,7 @@ import {
   alpha,
 } from '@mui/material'
 import { Link as RouterLink, Navigate, useNavigate } from 'react-router-dom'
-import { getAuthSession, listForms, logout, publishForm, type FormState } from '../api/generated'
+import { deleteForm, getAuthSession, listForms, logout, publishForm, type FormState } from '../api/generated'
 
 const statePresentation: Record<FormState, { label: string; color: string }> = {
   DRAFT: { label: 'Rascunho', color: '#f4b942' },
@@ -56,6 +56,21 @@ export function FormsAdminPage() {
       await queryClient.invalidateQueries({ queryKey: ['forms'] })
     },
   })
+  const deleteMutation = useMutation({
+    mutationFn: async (formId: number) => {
+      const response = await deleteForm({ path: { formId } })
+      if (response.error) throw new Error('Não foi possível excluir o formulário.')
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['forms'] })
+    },
+  })
+
+  const removeForm = (formId: number, title: string) => {
+    if (window.confirm(`Excluir o formulário "${title}"?`)) {
+      deleteMutation.mutate(formId)
+    }
+  }
 
   if (session.isLoading) {
     return (
@@ -151,6 +166,8 @@ export function FormsAdminPage() {
             </Stack>
           ) : forms.isError ? (
             <Alert severity="error" variant="outlined">{forms.error.message}</Alert>
+          ) : deleteMutation.isError ? (
+            <Alert severity="error" variant="outlined">{deleteMutation.error.message}</Alert>
           ) : forms.data?.length === 0 ? (
             <Paper
               variant="outlined"
@@ -225,12 +242,34 @@ export function FormsAdminPage() {
                           >
                             ✎
                           </Button>
+                          <Button
+                            color="error"
+                            disabled={deleteMutation.isPending}
+                            onClick={() => removeForm(form.id, form.title)}
+                            variant="outlined"
+                            aria-label={`Excluir ${form.title}`}
+                            title="Excluir formulário"
+                            sx={{ minWidth: 44, px: 1.25, fontSize: 19, lineHeight: 1 }}
+                          >
+                            🗑
+                          </Button>
                         </Stack>
                       )}
                       {form.state === 'PUBLISHED' && (
                         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
                           <Button component={RouterLink} fullWidth to={`/forms/${form.slug}`} variant="outlined">Abrir formulário</Button>
                           <Button component={RouterLink} fullWidth to={`/admin/forms/${form.id}/responses`} variant="contained">Ver respostas</Button>
+                          <Button
+                            color="error"
+                            disabled={deleteMutation.isPending}
+                            onClick={() => removeForm(form.id, form.title)}
+                            variant="outlined"
+                            aria-label={`Excluir ${form.title}`}
+                            title="Excluir formulário"
+                            sx={{ minWidth: 44, px: 1.25, fontSize: 19, lineHeight: 1 }}
+                          >
+                            🗑
+                          </Button>
                         </Stack>
                       )}
                     </Stack>

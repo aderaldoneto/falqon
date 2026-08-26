@@ -91,6 +91,10 @@ func (stub formRepositoryStub) Update(_ context.Context, _ int64, _ int64, title
 	return updated, stub.err
 }
 
+func (stub formRepositoryStub) Delete(context.Context, int64, int64) error {
+	return stub.err
+}
+
 func (stub formRepositoryStub) Publish(context.Context, int64, int64) (formdomain.Summary, error) {
 	if len(stub.forms) == 0 {
 		return formdomain.Summary{}, stub.err
