@@ -44,6 +44,11 @@ type PublicField struct {
 	Configuration []byte
 }
 
+type Submission struct {
+	ID        int64
+	CreatedAt time.Time
+}
+
 type Repository struct {
 	database *pgxpool.Pool
 }
@@ -203,6 +208,35 @@ func (repository *Repository) FindPublishedBySlug(ctx context.Context, slug stri
 		return PublicForm{}, fmt.Errorf("iterate public form fields: %w", err)
 	}
 	return form, nil
+}
+
+func (repository *Repository) CreateSubmission(ctx context.Context, formID int64, answers []Answer) (Submission, error) {
+	tx, err := repository.database.Begin(ctx)
+	if err != nil {
+		return Submission{}, fmt.Errorf("begin submission transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var submission Submission
+	err = tx.QueryRow(ctx, `
+		INSERT INTO submissions (form_id) VALUES ($1)
+		RETURNING id, created_at
+	`, formID).Scan(&submission.ID, &submission.CreatedAt)
+	if err != nil {
+		return Submission{}, fmt.Errorf("create submission: %w", err)
+	}
+	for _, answer := range answers {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO submission_answers (submission_id, field_id, value)
+			VALUES ($1, $2, $3)
+		`, submission.ID, answer.FieldID, answer.Value); err != nil {
+			return Submission{}, fmt.Errorf("create submission answer: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Submission{}, fmt.Errorf("commit submission transaction: %w", err)
+	}
+	return submission, nil
 }
 
 func nullableString(value string) *string {

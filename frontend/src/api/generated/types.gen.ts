@@ -56,6 +56,20 @@ export type PublicFormField = {
   };
 };
 
+export type CreateSubmissionRequest = {
+  answers: Array<SubmissionAnswer>;
+};
+
+export type SubmissionAnswer = {
+  field_id: number;
+  value: unknown;
+};
+
+export type SubmissionCreated = {
+  id: number;
+  created_at: string;
+};
+
 export type CreateFormRequest = {
   title: string;
   slug: string;
@@ -139,6 +153,39 @@ export type GetPublicFormResponses = {
 
 export type GetPublicFormResponse =
   GetPublicFormResponses[keyof GetPublicFormResponses];
+
+export type CreateSubmissionData = {
+  body: CreateSubmissionRequest;
+  path: {
+    slug: string;
+  };
+  query?: never;
+  url: "/forms/{slug}/submissions";
+};
+
+export type CreateSubmissionErrors = {
+  /**
+   * Formulario nao encontrado ou nao publicado
+   */
+  404: ErrorResponse;
+  /**
+   * Respostas invalidas
+   */
+  422: ErrorResponse;
+};
+
+export type CreateSubmissionError =
+  CreateSubmissionErrors[keyof CreateSubmissionErrors];
+
+export type CreateSubmissionResponses = {
+  /**
+   * Respostas salvas
+   */
+  201: SubmissionCreated;
+};
+
+export type CreateSubmissionResponse =
+  CreateSubmissionResponses[keyof CreateSubmissionResponses];
 
 export type GetHealthData = {
   body?: never;

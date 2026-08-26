@@ -10,6 +10,9 @@ import type {
   CreateFormData,
   CreateFormErrors,
   CreateFormResponses,
+  CreateSubmissionData,
+  CreateSubmissionErrors,
+  CreateSubmissionResponses,
   GetAuthSessionData,
   GetAuthSessionErrors,
   GetAuthSessionResponses,
@@ -61,6 +64,25 @@ export const getPublicForm = <ThrowOnError extends boolean = false>(
     GetPublicFormErrors,
     ThrowOnError
   >({ url: "/forms/{slug}", ...options });
+
+/**
+ * Valida e salva respostas de um formulario publicado
+ */
+export const createSubmission = <ThrowOnError extends boolean = false>(
+  options: Options<CreateSubmissionData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    CreateSubmissionResponses,
+    CreateSubmissionErrors,
+    ThrowOnError
+  >({
+    url: "/forms/{slug}/submissions",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
 
 /**
  * Consulta a saude da API

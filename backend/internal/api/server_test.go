@@ -42,8 +42,13 @@ type authRepositoryStub struct {
 }
 
 type formRepositoryStub struct {
-	forms []formdomain.Summary
-	err   error
+	forms      []formdomain.Summary
+	err        error
+	submission formdomain.Submission
+}
+
+func (stub formRepositoryStub) CreateSubmission(context.Context, int64, []formdomain.Answer) (formdomain.Submission, error) {
+	return stub.submission, stub.err
 }
 
 func (stub formRepositoryStub) Create(

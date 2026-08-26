@@ -39,6 +39,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /forms/{slug}/submissions:
+    post:
+      operationId: createSubmission
+      summary: Valida e salva respostas de um formulario publicado
+      tags:
+        - Forms
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSubmissionRequest"
+      responses:
+        "201":
+          description: Respostas salvas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionCreated"
+        "404":
+          description: Formulario nao encontrado ou nao publicado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Respostas invalidas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /health:
     get:
       operationId: getHealth
@@ -476,6 +513,40 @@ components:
         configuration:
           type: object
           additionalProperties: true
+    CreateSubmissionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - answers
+      properties:
+        answers:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubmissionAnswer"
+    SubmissionAnswer:
+      type: object
+      additionalProperties: false
+      required:
+        - field_id
+        - value
+      properties:
+        field_id:
+          type: integer
+          format: int64
+        value: {}
+    SubmissionCreated:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - created_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
     CreateFormRequest:
       type: object
       additionalProperties: false

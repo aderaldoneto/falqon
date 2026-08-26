@@ -112,6 +112,11 @@ type CreateFormRequest struct {
 	Title       string            `json:"title"`
 }
 
+// CreateSubmissionRequest defines model for CreateSubmissionRequest.
+type CreateSubmissionRequest struct {
+	Answers []SubmissionAnswer `json:"answers"`
+}
+
 // ErrorResponse defines model for ErrorResponse.
 type ErrorResponse struct {
 	Code    string `json:"code"`
@@ -194,6 +199,18 @@ type SingleChoiceConfiguration struct {
 	Choices []Choice `json:"choices"`
 }
 
+// SubmissionAnswer defines model for SubmissionAnswer.
+type SubmissionAnswer struct {
+	FieldId int64       `json:"field_id"`
+	Value   interface{} `json:"value"`
+}
+
+// SubmissionCreated defines model for SubmissionCreated.
+type SubmissionCreated struct {
+	CreatedAt time.Time `json:"created_at"`
+	Id        int64     `json:"id"`
+}
+
 // TextConfiguration defines model for TextConfiguration.
 type TextConfiguration struct {
 	MaxLength *int `json:"max_length,omitempty"`
@@ -246,6 +263,9 @@ type CreateFormJSONRequestBody = CreateFormRequest
 // RegisterUserJSONRequestBody defines body for RegisterUser for application/json ContentType.
 type RegisterUserJSONRequestBody = RegisterUserRequest
 
+// CreateSubmissionJSONRequestBody defines body for CreateSubmission for application/json ContentType.
+type CreateSubmissionJSONRequestBody = CreateSubmissionRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// ListForms Lista os formularios do usuario autenticado
@@ -275,6 +295,9 @@ type ServerInterface interface {
 	// GetPublicForm Busca um formulario publicado pelo slug
 	// (GET /forms/{slug})
 	GetPublicForm(w http.ResponseWriter, r *http.Request, slug string)
+	// CreateSubmission Valida e salva respostas de um formulario publicado
+	// (POST /forms/{slug}/submissions)
+	CreateSubmission(w http.ResponseWriter, r *http.Request, slug string)
 	// GetHealth Consulta a saude da API
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -335,6 +358,12 @@ func (_ Unimplemented) GetAuthSession(w http.ResponseWriter, r *http.Request, pa
 // GetPublicForm Busca um formulario publicado pelo slug
 // (GET /forms/{slug})
 func (_ Unimplemented) GetPublicForm(w http.ResponseWriter, r *http.Request, slug string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateSubmission Valida e salva respostas de um formulario publicado
+// (POST /forms/{slug}/submissions)
+func (_ Unimplemented) CreateSubmission(w http.ResponseWriter, r *http.Request, slug string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -665,6 +694,32 @@ func (siw *ServerInterfaceWrapper) GetPublicForm(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// CreateSubmission operation middleware
+func (siw *ServerInterfaceWrapper) CreateSubmission(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "slug" -------------
+	var slug string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "slug", chi.URLParam(r, "slug"), &slug, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "slug", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateSubmission(w, r, slug)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
 
@@ -794,6 +849,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/forms/{slug}", wrapper.GetPublicForm)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/forms/{slug}/submissions", wrapper.CreateSubmission)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.GetHealth)
@@ -1219,6 +1277,57 @@ func (response GetPublicForm404JSONResponse) VisitGetPublicFormResponse(w http.R
 	return err
 }
 
+type CreateSubmissionRequestObject struct {
+	Slug string `json:"slug"`
+	Body *CreateSubmissionJSONRequestBody
+}
+
+type CreateSubmissionResponseObject interface {
+	VisitCreateSubmissionResponse(w http.ResponseWriter) error
+}
+
+type CreateSubmission201JSONResponse SubmissionCreated
+
+func (response CreateSubmission201JSONResponse) VisitCreateSubmissionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSubmission404JSONResponse ErrorResponse
+
+func (response CreateSubmission404JSONResponse) VisitCreateSubmissionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSubmission422JSONResponse ErrorResponse
+
+func (response CreateSubmission422JSONResponse) VisitCreateSubmissionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetHealthRequestObject struct {
 }
 
@@ -1283,6 +1392,9 @@ type StrictServerInterface interface {
 	// GetPublicForm Busca um formulario publicado pelo slug
 	// (GET /forms/{slug})
 	GetPublicForm(ctx context.Context, request GetPublicFormRequestObject) (GetPublicFormResponseObject, error)
+	// CreateSubmission Valida e salva respostas de um formulario publicado
+	// (POST /forms/{slug}/submissions)
+	CreateSubmission(ctx context.Context, request CreateSubmissionRequestObject) (CreateSubmissionResponseObject, error)
 	// GetHealth Consulta a saude da API
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
@@ -1572,6 +1684,39 @@ func (sh *strictHandler) GetPublicForm(w http.ResponseWriter, r *http.Request, s
 	}
 }
 
+// CreateSubmission operation middleware
+func (sh *strictHandler) CreateSubmission(w http.ResponseWriter, r *http.Request, slug string) {
+	var request CreateSubmissionRequestObject
+
+	request.Slug = slug
+
+	var body CreateSubmissionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateSubmission(ctx, request.(CreateSubmissionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateSubmission")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateSubmissionResponseObject); ok {
+		if err := validResponse.VisitCreateSubmissionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetHealth operation middleware
 func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	var request GetHealthRequestObject
@@ -1601,40 +1746,43 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"/w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

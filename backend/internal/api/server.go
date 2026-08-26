@@ -46,6 +46,7 @@ type formRepository interface {
 	ListByOwner(context.Context, int64) ([]formdomain.Summary, error)
 	Publish(context.Context, int64, int64) (formdomain.Summary, error)
 	FindPublishedBySlug(context.Context, string) (formdomain.PublicForm, error)
+	CreateSubmission(context.Context, int64, []formdomain.Answer) (formdomain.Submission, error)
 }
 
 var formSlugPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
@@ -76,6 +77,55 @@ func (server *Server) GetPublicForm(
 	return GetPublicForm200JSONResponse{
 		Id: form.ID, Title: form.Title, Slug: form.Slug, Description: form.Description, Fields: fields,
 	}, nil
+}
+
+func (server *Server) CreateSubmission(
+	ctx context.Context,
+	request CreateSubmissionRequestObject,
+) (CreateSubmissionResponseObject, error) {
+	if request.Body == nil {
+		return CreateSubmission422JSONResponse{Code: "invalid_answers", Message: "answers are required"}, nil
+	}
+	form, err := server.formRepository.FindPublishedBySlug(ctx, request.Slug)
+	if errors.Is(err, formdomain.ErrFormNotFound) {
+		return CreateSubmission404JSONResponse{Code: "form_not_found", Message: "form was not found"}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	fields := make(map[int64]formdomain.PublicField, len(form.Fields))
+	for _, field := range form.Fields {
+		fields[field.ID] = field
+	}
+	provided := make(map[int64]struct{}, len(request.Body.Answers))
+	answers := make([]formdomain.Answer, 0, len(request.Body.Answers))
+	for _, input := range request.Body.Answers {
+		field, exists := fields[input.FieldId]
+		if !exists {
+			return invalidAnswers("answer references an unknown field"), nil
+		}
+		if _, duplicate := provided[input.FieldId]; duplicate {
+			return invalidAnswers("a field cannot be answered more than once"), nil
+		}
+		value, err := formdomain.ValidateAnswer(field, input.Value)
+		if err != nil {
+			return invalidAnswers(err.Error()), nil
+		}
+		provided[input.FieldId] = struct{}{}
+		answers = append(answers, formdomain.Answer{FieldID: input.FieldId, Value: value})
+	}
+	for _, field := range form.Fields {
+		if _, answered := provided[field.ID]; field.Required && !answered {
+			return invalidAnswers("all required fields must be answered"), nil
+		}
+	}
+
+	submission, err := server.formRepository.CreateSubmission(ctx, form.ID, answers)
+	if err != nil {
+		return nil, err
+	}
+	return CreateSubmission201JSONResponse{Id: submission.ID, CreatedAt: submission.CreatedAt}, nil
 }
 
 func (server *Server) RegisterUser(
@@ -476,6 +526,10 @@ func unauthenticatedCreateFormResponse() CreateForm401JSONResponse {
 
 func invalidForm(message string) CreateForm422JSONResponse {
 	return CreateForm422JSONResponse{Code: "invalid_form", Message: message}
+}
+
+func invalidAnswers(message string) CreateSubmission422JSONResponse {
+	return CreateSubmission422JSONResponse{Code: "invalid_answers", Message: message}
 }
 
 func nullableAPIString(value string) *string {
