@@ -13,7 +13,14 @@ import {
   alpha,
 } from '@mui/material'
 import { Link as RouterLink, Navigate, useNavigate } from 'react-router-dom'
-import { deleteForm, getAuthSession, listForms, logout, publishForm, type FormState } from '../api/generated'
+import {
+  deleteForm,
+  getAuthSession,
+  listForms,
+  logout,
+  publishForm,
+  type FormState,
+} from '../api/generated'
 
 const statePresentation: Record<FormState, { label: string; color: string }> = {
   DRAFT: { label: 'Rascunho', color: '#f4b942' },
@@ -117,8 +124,12 @@ export function FormsAdminPage() {
             </Button>
             <Stack direction="row" alignItems="center" spacing={2}>
               <Box textAlign="right" sx={{ display: { xs: 'none', sm: 'block' } }}>
-                <Typography fontSize={13} fontWeight={700}>{session.data.name}</Typography>
-                <Typography color="text.secondary" fontSize={11}>{session.data.email}</Typography>
+                <Typography fontSize={13} fontWeight={700}>
+                  {session.data.name}
+                </Typography>
+                <Typography color="text.secondary" fontSize={11}>
+                  {session.data.email}
+                </Typography>
               </Box>
               <Button
                 color="inherit"
@@ -142,7 +153,12 @@ export function FormsAdminPage() {
             spacing={2}
           >
             <Box>
-              <Typography color="primary.main" fontSize={11} fontWeight={800} letterSpacing="0.18em">
+              <Typography
+                color="primary.main"
+                fontSize={11}
+                fontWeight={800}
+                letterSpacing="0.18em"
+              >
                 ÁREA ADMINISTRATIVA
               </Typography>
               <Typography component="h1" variant="h3" fontFamily="Georgia, serif" sx={{ mt: 0.75 }}>
@@ -165,9 +181,13 @@ export function FormsAdminPage() {
               <Typography color="text.secondary">Carregando formulários...</Typography>
             </Stack>
           ) : forms.isError ? (
-            <Alert severity="error" variant="outlined">{forms.error.message}</Alert>
+            <Alert severity="error" variant="outlined">
+              {forms.error.message}
+            </Alert>
           ) : deleteMutation.isError ? (
-            <Alert severity="error" variant="outlined">{deleteMutation.error.message}</Alert>
+            <Alert severity="error" variant="outlined">
+              {deleteMutation.error.message}
+            </Alert>
           ) : forms.data?.length === 0 ? (
             <Paper
               variant="outlined"
@@ -179,7 +199,9 @@ export function FormsAdminPage() {
                 bgcolor: alpha('#ffffff', 0.02),
               }}
             >
-              <Typography fontFamily="Georgia, serif" fontSize={28}>Sua tela ainda está vazia.</Typography>
+              <Typography fontFamily="Georgia, serif" fontSize={28}>
+                Sua tela ainda está vazia.
+              </Typography>
               <Typography color="text.secondary" sx={{ mt: 1, maxWidth: 500, mx: 'auto' }}>
                 Crie seu primeiro formulário e comece uma conversa sobre cinema.
               </Typography>
@@ -198,12 +220,18 @@ export function FormsAdminPage() {
                   <Paper
                     key={form.id}
                     variant="outlined"
-                    sx={{ p: 3, borderColor: alpha('#ffffff', 0.09), bgcolor: alpha('#ffffff', 0.025) }}
+                    sx={{
+                      p: 3,
+                      borderColor: alpha('#ffffff', 0.09),
+                      bgcolor: alpha('#ffffff', 0.025),
+                    }}
                   >
                     <Stack spacing={2.5}>
                       <Stack direction="row" justifyContent="space-between" spacing={2}>
                         <Box>
-                          <Typography variant="h6" fontWeight={750}>{form.title}</Typography>
+                          <Typography variant="h6" fontWeight={750}>
+                            {form.title}
+                          </Typography>
                           <Typography color="text.secondary" fontFamily="monospace" fontSize={12}>
                             /forms/{form.slug}
                           </Typography>
@@ -221,7 +249,10 @@ export function FormsAdminPage() {
                         </Typography>
                       )}
                       <Typography color="text.disabled" fontSize={11}>
-                        Atualizado em {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(new Date(form.updated_at))}
+                        Atualizado em{' '}
+                        {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(
+                          new Date(form.updated_at),
+                        )}
                       </Typography>
                       {form.state === 'DRAFT' && (
                         <Stack direction="row" spacing={1} alignItems="center">
@@ -257,8 +288,22 @@ export function FormsAdminPage() {
                       )}
                       {form.state === 'PUBLISHED' && (
                         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                          <Button component={RouterLink} fullWidth to={`/forms/${form.slug}`} variant="outlined">Abrir formulário</Button>
-                          <Button component={RouterLink} fullWidth to={`/admin/forms/${form.id}/responses`} variant="contained">Ver respostas</Button>
+                          <Button
+                            component={RouterLink}
+                            fullWidth
+                            to={`/forms/${form.slug}`}
+                            variant="outlined"
+                          >
+                            Abrir formulário
+                          </Button>
+                          <Button
+                            component={RouterLink}
+                            fullWidth
+                            to={`/admin/forms/${form.id}/responses`}
+                            variant="contained"
+                          >
+                            Ver respostas
+                          </Button>
                           <Button
                             color="error"
                             disabled={deleteMutation.isPending}

@@ -39,12 +39,22 @@ export function PublicFormsPage() {
       <Container maxWidth="lg" sx={{ py: { xs: 4, md: 7 } }}>
         <Stack spacing={4}>
           <Stack spacing={2}>
-            <Button component={RouterLink} color="inherit" to="/" sx={{ alignSelf: 'flex-start', px: 0 }}>
+            <Button
+              component={RouterLink}
+              color="inherit"
+              to="/"
+              sx={{ alignSelf: 'flex-start', px: 0 }}
+            >
               FALQON
             </Button>
             <Divider sx={{ borderColor: alpha('#ffffff', 0.08) }} />
             <Box>
-              <Typography color="primary.main" fontSize={11} fontWeight={800} letterSpacing="0.18em">
+              <Typography
+                color="primary.main"
+                fontSize={11}
+                fontWeight={800}
+                letterSpacing="0.18em"
+              >
                 PARTICIPE DAS REVIEWS
               </Typography>
               <Typography component="h1" variant="h3" fontFamily="Georgia, serif" sx={{ mt: 0.75 }}>
@@ -62,24 +72,56 @@ export function PublicFormsPage() {
               <Typography color="text.secondary">Carregando formulários...</Typography>
             </Stack>
           ) : forms.isError ? (
-            <Alert severity="error" variant="outlined">{forms.error.message}</Alert>
+            <Alert severity="error" variant="outlined">
+              {forms.error.message}
+            </Alert>
           ) : forms.data?.length === 0 ? (
-            <Paper variant="outlined" sx={{ py: 8, px: 3, textAlign: 'center', borderColor: alpha('#ffffff', 0.1) }}>
-              <Typography fontFamily="Georgia, serif" fontSize={28}>Nenhum formulário publicado.</Typography>
+            <Paper
+              variant="outlined"
+              sx={{ py: 8, px: 3, textAlign: 'center', borderColor: alpha('#ffffff', 0.1) }}
+            >
+              <Typography fontFamily="Georgia, serif" fontSize={28}>
+                Nenhum formulário publicado.
+              </Typography>
               <Typography color="text.secondary" sx={{ mt: 1 }}>
                 Novas pesquisas aparecerão aqui quando estiverem disponíveis.
               </Typography>
             </Paper>
           ) : (
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2 }}>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
+                gap: 2,
+              }}
+            >
               {forms.data?.map((form) => (
-                <Paper key={form.id} variant="outlined" sx={{ p: 3, borderColor: alpha('#ffffff', 0.1), bgcolor: alpha('#ffffff', 0.025) }}>
+                <Paper
+                  key={form.id}
+                  variant="outlined"
+                  sx={{
+                    p: 3,
+                    borderColor: alpha('#ffffff', 0.1),
+                    bgcolor: alpha('#ffffff', 0.025),
+                  }}
+                >
                   <Stack spacing={2.5}>
                     <Box>
-                      <Typography variant="h5" fontWeight={750}>{form.title}</Typography>
-                      {form.description && <Typography color="text.secondary" sx={{ mt: 1 }}>{form.description}</Typography>}
+                      <Typography variant="h5" fontWeight={750}>
+                        {form.title}
+                      </Typography>
+                      {form.description && (
+                        <Typography color="text.secondary" sx={{ mt: 1 }}>
+                          {form.description}
+                        </Typography>
+                      )}
                     </Box>
-                    <Button component={RouterLink} to={`/forms/${form.slug}`} variant="contained" size="large">
+                    <Button
+                      component={RouterLink}
+                      to={`/forms/${form.slug}`}
+                      variant="contained"
+                      size="large"
+                    >
                       Responder formulário
                     </Button>
                   </Stack>

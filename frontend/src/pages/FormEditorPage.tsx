@@ -97,14 +97,16 @@ export function FormEditorPage() {
     setSlug(existingForm.data.slug)
     setSlugEdited(true)
     setDescription(existingForm.data.description ?? '')
-    setFields(existingForm.data.fields.map((field) => ({
-      key: field.id,
-      type: field.type,
-      label: field.label,
-      description: field.description ?? '',
-      required: field.required,
-      configuration: field.configuration,
-    })))
+    setFields(
+      existingForm.data.fields.map((field) => ({
+        key: field.id,
+        type: field.type,
+        label: field.label,
+        description: field.description ?? '',
+        required: field.required,
+        configuration: field.configuration,
+      })),
+    )
     setNextKey(existingForm.data.fields.length + 1)
   }, [existingForm.data])
   const save = useMutation({
@@ -127,7 +129,8 @@ export function FormEditorPage() {
       if (response.error) {
         const error = response.error as { code?: string; message?: string }
         if (error.code === 'slug_already_exists') throw new Error('Este slug já está em uso.')
-        if (error.code === 'invalid_form_state') throw new Error('Apenas rascunhos podem ser editados.')
+        if (error.code === 'invalid_form_state')
+          throw new Error('Apenas rascunhos podem ser editados.')
         throw new Error(error.message ?? 'Não foi possível salvar o formulário.')
       }
       return response.data
@@ -139,7 +142,9 @@ export function FormEditorPage() {
   })
 
   const updateField = (key: number, changes: Partial<EditorField>) => {
-    setFields((current) => current.map((field) => (field.key === key ? { ...field, ...changes } : field)))
+    setFields((current) =>
+      current.map((field) => (field.key === key ? { ...field, ...changes } : field)),
+    )
   }
 
   const changeFieldType = (field: EditorField, type: FormFieldType) => {
@@ -174,14 +179,24 @@ export function FormEditorPage() {
   }
 
   if (session.isLoading) {
-    return <Box minHeight="100vh" display="grid" sx={{ placeItems: 'center' }}><CircularProgress /></Box>
+    return (
+      <Box minHeight="100vh" display="grid" sx={{ placeItems: 'center' }}>
+        <CircularProgress />
+      </Box>
+    )
   }
   if (!session.data) return <Navigate replace to="/" />
   if (isEditing && existingForm.isLoading) {
-    return <Box minHeight="100vh" display="grid" sx={{ placeItems: 'center' }}><CircularProgress aria-label="Carregando formulário" /></Box>
+    return (
+      <Box minHeight="100vh" display="grid" sx={{ placeItems: 'center' }}>
+        <CircularProgress aria-label="Carregando formulário" />
+      </Box>
+    )
   }
   if (isEditing && (existingForm.isError || !existingForm.data)) {
-    return <Alert severity="error">{existingForm.error?.message ?? 'Formulário não encontrado.'}</Alert>
+    return (
+      <Alert severity="error">{existingForm.error?.message ?? 'Formulário não encontrado.'}</Alert>
+    )
   }
 
   return (
@@ -189,8 +204,12 @@ export function FormEditorPage() {
       <Box component="header" sx={{ borderBottom: '1px solid', borderColor: alpha('#fff', 0.08) }}>
         <Container maxWidth="lg">
           <Stack direction="row" justifyContent="space-between" alignItems="center" py={2}>
-            <Button component={RouterLink} color="inherit" to="/admin/forms">← Meus formulários</Button>
-            <Typography color="text.secondary" fontSize={13}>{isEditing ? 'Editando rascunho' : 'Rascunho não salvo'}</Typography>
+            <Button component={RouterLink} color="inherit" to="/admin/forms">
+              ← Meus formulários
+            </Button>
+            <Typography color="text.secondary" fontSize={13}>
+              {isEditing ? 'Editando rascunho' : 'Rascunho não salvo'}
+            </Typography>
           </Stack>
         </Container>
       </Box>
@@ -199,7 +218,12 @@ export function FormEditorPage() {
         <Box component="form" onSubmit={submit}>
           <Stack spacing={4}>
             <Box>
-              <Typography color="primary.main" fontSize={11} fontWeight={800} letterSpacing="0.18em">
+              <Typography
+                color="primary.main"
+                fontSize={11}
+                fontWeight={800}
+                letterSpacing="0.18em"
+              >
                 EDITOR DINÂMICO
               </Typography>
               <Typography component="h1" variant="h3" fontFamily="Georgia, serif" sx={{ mt: 0.75 }}>
@@ -208,12 +232,19 @@ export function FormEditorPage() {
             </Box>
 
             {(validationError || save.error) && (
-              <Alert severity="error" variant="outlined">{validationError ?? save.error?.message}</Alert>
+              <Alert severity="error" variant="outlined">
+                {validationError ?? save.error?.message}
+              </Alert>
             )}
 
-            <Paper variant="outlined" sx={{ p: { xs: 2.5, md: 4 }, borderColor: alpha('#fff', 0.1) }}>
+            <Paper
+              variant="outlined"
+              sx={{ p: { xs: 2.5, md: 4 }, borderColor: alpha('#fff', 0.1) }}
+            >
               <Stack spacing={2.5}>
-                <Typography variant="h6" fontWeight={750}>Sobre o filme</Typography>
+                <Typography variant="h6" fontWeight={750}>
+                  Sobre o filme
+                </Typography>
                 <TextField
                   label="Título do formulário"
                   onChange={(event) => {
@@ -244,12 +275,24 @@ export function FormEditorPage() {
             </Paper>
 
             <Stack spacing={2}>
-              <Typography variant="h5" fontWeight={750}>Perguntas</Typography>
+              <Typography variant="h5" fontWeight={750}>
+                Perguntas
+              </Typography>
               {fields.map((field, index) => (
-                <Paper key={field.key} variant="outlined" sx={{ p: { xs: 2.5, md: 3 }, borderColor: alpha('#fff', 0.1) }}>
+                <Paper
+                  key={field.key}
+                  variant="outlined"
+                  sx={{ p: { xs: 2.5, md: 3 }, borderColor: alpha('#fff', 0.1) }}
+                >
                   <Stack spacing={2.25}>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}>
-                      <Typography color="primary.main" fontFamily="monospace">{String(index + 1).padStart(2, '0')}</Typography>
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      spacing={1.5}
+                      alignItems={{ sm: 'center' }}
+                    >
+                      <Typography color="primary.main" fontFamily="monospace">
+                        {String(index + 1).padStart(2, '0')}
+                      </Typography>
                       <TextField
                         fullWidth
                         label="Pergunta"
@@ -260,31 +303,68 @@ export function FormEditorPage() {
                       />
                       <TextField
                         label="Tipo"
-                        onChange={(event) => changeFieldType(field, event.target.value as FormFieldType)}
+                        onChange={(event) =>
+                          changeFieldType(field, event.target.value as FormFieldType)
+                        }
                         select
                         size="small"
                         sx={{ minWidth: 190 }}
                         value={field.type}
                       >
-                        {fieldTypes.map((option) => <MenuItem key={option.type} value={option.type}>{option.label}</MenuItem>)}
+                        {fieldTypes.map((option) => (
+                          <MenuItem key={option.type} value={option.type}>
+                            {option.label}
+                          </MenuItem>
+                        ))}
                       </TextField>
                     </Stack>
                     <TextField
                       label="Descrição de apoio (opcional)"
-                      onChange={(event) => updateField(field.key, { description: event.target.value })}
+                      onChange={(event) =>
+                        updateField(field.key, { description: event.target.value })
+                      }
                       size="small"
                       value={field.description ?? ''}
                     />
-                    <FieldConfiguration field={field} update={(configuration) => updateField(field.key, { configuration })} />
+                    <FieldConfiguration
+                      field={field}
+                      update={(configuration) => updateField(field.key, { configuration })}
+                    />
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
                       <FormControlLabel
-                        control={<Switch checked={field.required} onChange={(event) => updateField(field.key, { required: event.target.checked })} />}
+                        control={
+                          <Switch
+                            checked={field.required}
+                            onChange={(event) =>
+                              updateField(field.key, { required: event.target.checked })
+                            }
+                          />
+                        }
                         label="Obrigatória"
                       />
                       <Stack direction="row" spacing={0.5}>
-                        <Button disabled={index === 0} onClick={() => moveField(index, -1)} size="small">↑</Button>
-                        <Button disabled={index === fields.length - 1} onClick={() => moveField(index, 1)} size="small">↓</Button>
-                        <Button color="error" disabled={fields.length === 1} onClick={() => setFields(fields.filter((item) => item.key !== field.key))} size="small">Remover</Button>
+                        <Button
+                          disabled={index === 0}
+                          onClick={() => moveField(index, -1)}
+                          size="small"
+                        >
+                          ↑
+                        </Button>
+                        <Button
+                          disabled={index === fields.length - 1}
+                          onClick={() => moveField(index, 1)}
+                          size="small"
+                        >
+                          ↓
+                        </Button>
+                        <Button
+                          color="error"
+                          disabled={fields.length === 1}
+                          onClick={() => setFields(fields.filter((item) => item.key !== field.key))}
+                          size="small"
+                        >
+                          Remover
+                        </Button>
                       </Stack>
                     </Stack>
                   </Stack>
@@ -292,17 +372,31 @@ export function FormEditorPage() {
               ))}
             </Stack>
 
-            <Paper variant="outlined" sx={{ p: 2.5, borderStyle: 'dashed', borderColor: alpha('#f4b942', 0.35) }}>
-              <Typography fontWeight={700} mb={1.5}>Adicionar pergunta</Typography>
+            <Paper
+              variant="outlined"
+              sx={{ p: 2.5, borderStyle: 'dashed', borderColor: alpha('#f4b942', 0.35) }}
+            >
+              <Typography fontWeight={700} mb={1.5}>
+                Adicionar pergunta
+              </Typography>
               <Stack direction="row" flexWrap="wrap" gap={1}>
                 {fieldTypes.map((option) => (
-                  <Button key={option.type} onClick={() => addField(option.type)} size="small" variant="outlined">+ {option.label}</Button>
+                  <Button
+                    key={option.type}
+                    onClick={() => addField(option.type)}
+                    size="small"
+                    variant="outlined"
+                  >
+                    + {option.label}
+                  </Button>
                 ))}
               </Stack>
             </Paper>
 
             <Stack direction="row" justifyContent="flex-end" spacing={1.5}>
-              <Button component={RouterLink} color="inherit" to="/admin/forms">Cancelar</Button>
+              <Button component={RouterLink} color="inherit" to="/admin/forms">
+                Cancelar
+              </Button>
               <Button disabled={save.isPending} size="large" type="submit" variant="contained">
                 {save.isPending ? 'Salvando...' : 'Salvar rascunho'}
               </Button>
@@ -314,32 +408,107 @@ export function FormEditorPage() {
   )
 }
 
-function FieldConfiguration({ field, update }: { field: EditorField; update: (value: Record<string, unknown>) => void }) {
+function FieldConfiguration({
+  field,
+  update,
+}: {
+  field: EditorField
+  update: (value: Record<string, unknown>) => void
+}) {
   const configuration = field.configuration
   if (field.type === 'SHORT_TEXT' || field.type === 'LONG_TEXT') {
-    return <TextField label="Máximo de caracteres" type="number" size="small" value={String(configuration.max_length ?? '')} onChange={(event) => update({ max_length: Number(event.target.value) })} />
+    return (
+      <TextField
+        label="Máximo de caracteres"
+        type="number"
+        size="small"
+        value={String(configuration.max_length ?? '')}
+        onChange={(event) => update({ max_length: Number(event.target.value) })}
+      />
+    )
   }
   if (field.type === 'NUMBER') {
     return (
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-        {['min', 'max', 'step'].map((name) => <TextField key={name} fullWidth label={{ min: 'Mínimo', max: 'Máximo', step: 'Intervalo' }[name]} type="number" size="small" value={String(configuration[name] ?? '')} onChange={(event) => update({ ...configuration, [name]: event.target.value === '' ? undefined : Number(event.target.value) })} />)}
+        {['min', 'max', 'step'].map((name) => (
+          <TextField
+            key={name}
+            fullWidth
+            label={{ min: 'Mínimo', max: 'Máximo', step: 'Intervalo' }[name]}
+            type="number"
+            size="small"
+            value={String(configuration[name] ?? '')}
+            onChange={(event) =>
+              update({
+                ...configuration,
+                [name]: event.target.value === '' ? undefined : Number(event.target.value),
+              })
+            }
+          />
+        ))}
       </Stack>
     )
   }
   if (field.type === 'RATING') {
-    return <TextField label="Nota máxima" type="number" inputProps={{ min: 2, max: 10 }} size="small" value={String(configuration.max ?? 5)} onChange={(event) => update({ min: 1, max: Number(event.target.value) })} />
+    return (
+      <TextField
+        label="Nota máxima"
+        type="number"
+        inputProps={{ min: 2, max: 10 }}
+        size="small"
+        value={String(configuration.max ?? 5)}
+        onChange={(event) => update({ min: 1, max: Number(event.target.value) })}
+      />
+    )
   }
   const choices = (configuration.choices as Array<{ value: string; label: string }>) ?? []
   return (
     <Stack spacing={1}>
-      <Typography color="text.secondary" fontSize={12}>Opções de resposta</Typography>
+      <Typography color="text.secondary" fontSize={12}>
+        Opções de resposta
+      </Typography>
       {choices.map((choice, index) => (
         <Stack key={choice.value} direction="row" spacing={1}>
-          <TextField fullWidth size="small" value={choice.label} onChange={(event) => update({ ...configuration, choices: choices.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item) })} />
-          <Button disabled={choices.length <= 2} onClick={() => update({ ...configuration, choices: choices.filter((_, itemIndex) => itemIndex !== index) })}>Remover</Button>
+          <TextField
+            fullWidth
+            size="small"
+            value={choice.label}
+            onChange={(event) =>
+              update({
+                ...configuration,
+                choices: choices.map((item, itemIndex) =>
+                  itemIndex === index ? { ...item, label: event.target.value } : item,
+                ),
+              })
+            }
+          />
+          <Button
+            disabled={choices.length <= 2}
+            onClick={() =>
+              update({
+                ...configuration,
+                choices: choices.filter((_, itemIndex) => itemIndex !== index),
+              })
+            }
+          >
+            Remover
+          </Button>
         </Stack>
       ))}
-      <Button onClick={() => update({ ...configuration, choices: [...choices, { value: `option-${Date.now()}`, label: `Opção ${choices.length + 1}` }] })} sx={{ alignSelf: 'flex-start' }}>+ Adicionar opção</Button>
+      <Button
+        onClick={() =>
+          update({
+            ...configuration,
+            choices: [
+              ...choices,
+              { value: `option-${Date.now()}`, label: `Opção ${choices.length + 1}` },
+            ],
+          })
+        }
+        sx={{ alignSelf: 'flex-start' }}
+      >
+        + Adicionar opção
+      </Button>
     </Stack>
   )
 }

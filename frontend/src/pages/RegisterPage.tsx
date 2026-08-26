@@ -137,7 +137,12 @@ export function RegisterPage() {
           >
             <Stack spacing={3}>
               <Box>
-                <Typography color="primary.main" fontSize={11} fontWeight={800} letterSpacing="0.18em">
+                <Typography
+                  color="primary.main"
+                  fontSize={11}
+                  fontWeight={800}
+                  letterSpacing="0.18em"
+                >
                   CRIE SUA CONTA
                 </Typography>
                 <Typography component="h1" variant="h4" fontWeight={750} sx={{ mt: 1 }}>

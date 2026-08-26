@@ -44,10 +44,7 @@ const benefits = [
 export function HomePage() {
   const queryClient = useQueryClient()
   const apiURL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080'
-  const authError = useMemo(
-    () => new URLSearchParams(window.location.search).get('auth_error'),
-    [],
-  )
+  const authError = useMemo(() => new URLSearchParams(window.location.search).get('auth_error'), [])
 
   const session = useQuery({
     queryKey: sessionQueryKey,
@@ -133,12 +130,7 @@ export function HomePage() {
         >
           <Stack spacing={4}>
             <Stack spacing={2.5}>
-              <Typography
-                color="primary.main"
-                fontSize={12}
-                fontWeight={800}
-                letterSpacing="0.2em"
-              >
+              <Typography color="primary.main" fontSize={12} fontWeight={800} letterSpacing="0.2em">
                 FORMULÁRIOS PARA CINÉFILOS
               </Typography>
               <Typography
@@ -158,8 +150,8 @@ export function HomePage() {
                 color="text.secondary"
                 sx={{ maxWidth: 590, fontSize: { xs: 17, sm: 19 }, lineHeight: 1.65 }}
               >
-                Crie questionários únicos, compartilhe com quem assistiu e
-                descubra novos olhares sobre as histórias que ficaram com você.
+                Crie questionários únicos, compartilhe com quem assistiu e descubra novos olhares
+                sobre as histórias que ficaram com você.
               </Typography>
             </Stack>
 
@@ -278,8 +270,8 @@ export function HomePage() {
               ) : (
                 <Stack spacing={2.5}>
                   <Typography color="text.secondary" lineHeight={1.65}>
-                    Entre para criar seus formulários de review e acompanhar o
-                    que sua audiência tem a dizer.
+                    Entre para criar seus formulários de review e acompanhar o que sua audiência tem
+                    a dizer.
                   </Typography>
                   <Button
                     fullWidth
