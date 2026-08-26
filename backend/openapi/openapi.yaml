@@ -14,6 +14,31 @@ tags:
   - name: Forms
     description: Gerenciamento administrativo de formularios
 paths:
+  /forms/{slug}:
+    get:
+      operationId: getPublicForm
+      summary: Busca um formulario publicado pelo slug
+      tags:
+        - Forms
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Formulario publico
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicForm"
+        "404":
+          description: Formulario nao encontrado ou nao publicado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /health:
     get:
       operationId: getHealth
@@ -405,6 +430,52 @@ components:
         updated_at:
           type: string
           format: date-time
+    PublicForm:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - title
+        - slug
+        - fields
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicFormField"
+    PublicFormField:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - type
+        - label
+        - required
+        - configuration
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          $ref: "#/components/schemas/FormFieldType"
+        label:
+          type: string
+        description:
+          type: string
+        required:
+          type: boolean
+        configuration:
+          type: object
+          additionalProperties: true
     CreateFormRequest:
       type: object
       additionalProperties: false

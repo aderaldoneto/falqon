@@ -45,9 +45,38 @@ type formRepository interface {
 	Create(context.Context, int64, string, string, *string, []formdomain.FieldDefinition) (formdomain.Summary, error)
 	ListByOwner(context.Context, int64) ([]formdomain.Summary, error)
 	Publish(context.Context, int64, int64) (formdomain.Summary, error)
+	FindPublishedBySlug(context.Context, string) (formdomain.PublicForm, error)
 }
 
 var formSlugPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
+
+func (server *Server) GetPublicForm(
+	ctx context.Context,
+	request GetPublicFormRequestObject,
+) (GetPublicFormResponseObject, error) {
+	form, err := server.formRepository.FindPublishedBySlug(ctx, request.Slug)
+	if errors.Is(err, formdomain.ErrFormNotFound) {
+		return GetPublicForm404JSONResponse{Code: "form_not_found", Message: "form was not found"}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	fields := make([]PublicFormField, 0, len(form.Fields))
+	for _, field := range form.Fields {
+		configuration := make(map[string]interface{})
+		if err := json.Unmarshal(field.Configuration, &configuration); err != nil {
+			return nil, err
+		}
+		fields = append(fields, PublicFormField{
+			Id: field.ID, Type: FormFieldType(field.Type), Label: field.Label,
+			Description: field.Description, Required: field.Required, Configuration: configuration,
+		})
+	}
+	return GetPublicForm200JSONResponse{
+		Id: form.ID, Title: form.Title, Slug: form.Slug, Description: form.Description, Fields: fields,
+	}, nil
+}
 
 func (server *Server) RegisterUser(
 	ctx context.Context,

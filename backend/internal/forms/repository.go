@@ -27,6 +27,23 @@ type Summary struct {
 	UpdatedAt   time.Time
 }
 
+type PublicForm struct {
+	ID          int64
+	Title       string
+	Slug        string
+	Description *string
+	Fields      []PublicField
+}
+
+type PublicField struct {
+	ID            int64
+	Type          FieldType
+	Label         string
+	Description   *string
+	Required      bool
+	Configuration []byte
+}
+
 type Repository struct {
 	database *pgxpool.Pool
 }
@@ -148,6 +165,44 @@ func (repository *Repository) Publish(ctx context.Context, formID, ownerID int64
 		return Summary{}, fmt.Errorf("find form for publication: %w", err)
 	}
 	return Summary{}, ErrInvalidFormState
+}
+
+func (repository *Repository) FindPublishedBySlug(ctx context.Context, slug string) (PublicForm, error) {
+	var form PublicForm
+	err := repository.database.QueryRow(ctx, `
+		SELECT id, title, slug, description
+		FROM forms
+		WHERE slug = $1 AND state = 'PUBLISHED' AND deleted_at IS NULL
+	`, slug).Scan(&form.ID, &form.Title, &form.Slug, &form.Description)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return PublicForm{}, ErrFormNotFound
+	}
+	if err != nil {
+		return PublicForm{}, fmt.Errorf("find published form: %w", err)
+	}
+
+	rows, err := repository.database.Query(ctx, `
+		SELECT id, field_type, label, description, required, configuration
+		FROM form_fields
+		WHERE form_id = $1 AND deleted_at IS NULL
+		ORDER BY position, id
+	`, form.ID)
+	if err != nil {
+		return PublicForm{}, fmt.Errorf("list public form fields: %w", err)
+	}
+	defer rows.Close()
+	form.Fields = make([]PublicField, 0)
+	for rows.Next() {
+		var field PublicField
+		if err := rows.Scan(&field.ID, &field.Type, &field.Label, &field.Description, &field.Required, &field.Configuration); err != nil {
+			return PublicForm{}, fmt.Errorf("scan public form field: %w", err)
+		}
+		form.Fields = append(form.Fields, field)
+	}
+	if err := rows.Err(); err != nil {
+		return PublicForm{}, fmt.Errorf("iterate public form fields: %w", err)
+	}
+	return form, nil
 }
 
 func nullableString(value string) *string {

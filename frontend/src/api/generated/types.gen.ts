@@ -37,6 +37,25 @@ export type FormSummary = {
   updated_at: string;
 };
 
+export type PublicForm = {
+  id: number;
+  title: string;
+  slug: string;
+  description?: string;
+  fields: Array<PublicFormField>;
+};
+
+export type PublicFormField = {
+  id: number;
+  type: FormFieldType;
+  label: string;
+  description?: string;
+  required: boolean;
+  configuration: {
+    [key: string]: unknown;
+  };
+};
+
 export type CreateFormRequest = {
   title: string;
   slug: string;
@@ -92,6 +111,34 @@ export type RatingConfiguration = {
   min: number;
   max: number;
 };
+
+export type GetPublicFormData = {
+  body?: never;
+  path: {
+    slug: string;
+  };
+  query?: never;
+  url: "/forms/{slug}";
+};
+
+export type GetPublicFormErrors = {
+  /**
+   * Formulario nao encontrado ou nao publicado
+   */
+  404: ErrorResponse;
+};
+
+export type GetPublicFormError = GetPublicFormErrors[keyof GetPublicFormErrors];
+
+export type GetPublicFormResponses = {
+  /**
+   * Formulario publico
+   */
+  200: PublicForm;
+};
+
+export type GetPublicFormResponse =
+  GetPublicFormResponses[keyof GetPublicFormResponses];
 
 export type GetHealthData = {
   body?: never;

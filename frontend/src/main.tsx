@@ -7,6 +7,7 @@ import { HomePage } from './pages/HomePage'
 import { RegisterPage } from './pages/RegisterPage'
 import { FormsAdminPage } from './pages/FormsAdminPage'
 import { FormEditorPage } from './pages/FormEditorPage'
+import { PublicFormPage } from './pages/PublicFormPage'
 
 const queryClient = new QueryClient()
 const theme = createTheme({
@@ -36,6 +37,7 @@ const theme = createTheme({
 const router = createBrowserRouter([
   { path: '/', element: <HomePage /> },
   { path: '/register', element: <RegisterPage /> },
+  { path: '/forms/:slug', element: <PublicFormPage /> },
   { path: '/admin/forms', element: <FormsAdminPage /> },
   { path: '/admin/forms/new', element: <FormEditorPage /> },
 ])

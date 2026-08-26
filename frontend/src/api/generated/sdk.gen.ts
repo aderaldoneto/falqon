@@ -16,6 +16,9 @@ import type {
   GetHealthData,
   GetHealthErrors,
   GetHealthResponses,
+  GetPublicFormData,
+  GetPublicFormErrors,
+  GetPublicFormResponses,
   ListFormsData,
   ListFormsErrors,
   ListFormsResponses,
@@ -46,6 +49,18 @@ export type Options<
    */
   meta?: Record<string, unknown>;
 };
+
+/**
+ * Busca um formulario publicado pelo slug
+ */
+export const getPublicForm = <ThrowOnError extends boolean = false>(
+  options: Options<GetPublicFormData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<
+    GetPublicFormResponses,
+    GetPublicFormErrors,
+    ThrowOnError
+  >({ url: "/forms/{slug}", ...options });
 
 /**
  * Consulta a saude da API

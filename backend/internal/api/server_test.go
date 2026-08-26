@@ -71,6 +71,20 @@ func (stub formRepositoryStub) Publish(context.Context, int64, int64) (formdomai
 	return stub.forms[0], stub.err
 }
 
+func (stub formRepositoryStub) FindPublishedBySlug(context.Context, string) (formdomain.PublicForm, error) {
+	if len(stub.forms) == 0 {
+		return formdomain.PublicForm{}, stub.err
+	}
+	form := stub.forms[0]
+	return formdomain.PublicForm{
+		ID: form.ID, Title: form.Title, Slug: form.Slug, Description: form.Description,
+		Fields: []formdomain.PublicField{{
+			ID: 21, Type: formdomain.FieldTypeRating, Label: "Nota", Required: true,
+			Configuration: []byte(`{"min":1,"max":5}`),
+		}},
+	}, stub.err
+}
+
 func (stub authRepositoryStub) CreateEmailUser(
 	context.Context,
 	string,
@@ -285,6 +299,39 @@ func TestListFormsReturnsAuthenticatedUsersForms(t *testing.T) {
 	list, ok := response.(ListForms200JSONResponse)
 	if !ok || len(list) != 1 || list[0].Slug != "the-godfather" {
 		t.Fatalf("ListForms() response = %#v, want the authenticated user's form", response)
+	}
+}
+
+func TestGetPublicFormReturnsPublishedDefinition(t *testing.T) {
+	t.Parallel()
+
+	server := newAuthTestServerWithForms(
+		googleAuthenticatorStub{}, authRepositoryStub{}, formRepositoryStub{forms: []formdomain.Summary{{
+			ID: 11, Title: "The Godfather", Slug: "the-godfather", State: "PUBLISHED",
+		}}},
+	)
+	response, err := server.GetPublicForm(context.Background(), GetPublicFormRequestObject{Slug: "the-godfather"})
+	if err != nil {
+		t.Fatalf("GetPublicForm() error = %v", err)
+	}
+	form, ok := response.(GetPublicForm200JSONResponse)
+	if !ok || len(form.Fields) != 1 || form.Fields[0].Type != RATING {
+		t.Fatalf("GetPublicForm() response = %#v, want public form", response)
+	}
+}
+
+func TestGetPublicFormReturnsNotFound(t *testing.T) {
+	t.Parallel()
+
+	server := newAuthTestServerWithForms(
+		googleAuthenticatorStub{}, authRepositoryStub{}, formRepositoryStub{err: formdomain.ErrFormNotFound},
+	)
+	response, err := server.GetPublicForm(context.Background(), GetPublicFormRequestObject{Slug: "draft"})
+	if err != nil {
+		t.Fatalf("GetPublicForm() error = %v", err)
+	}
+	if _, ok := response.(GetPublicForm404JSONResponse); !ok {
+		t.Fatalf("GetPublicForm() response = %T, want GetPublicForm404JSONResponse", response)
 	}
 }
 
