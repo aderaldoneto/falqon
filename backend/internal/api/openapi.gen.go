@@ -140,6 +140,12 @@ type CreateSubmissionRequest struct {
 	Answers []SubmissionAnswer `json:"answers"`
 }
 
+// EmailLoginRequest defines model for EmailLoginRequest.
+type EmailLoginRequest struct {
+	Email    openapi_types.Email `json:"email"`
+	Password string              `json:"password"`
+}
+
 // ErrorResponse defines model for ErrorResponse.
 type ErrorResponse struct {
 	Code    string `json:"code"`
@@ -306,6 +312,9 @@ type CreateFormJSONRequestBody = CreateFormRequest
 // UpdateFormJSONRequestBody defines body for UpdateForm for application/json ContentType.
 type UpdateFormJSONRequestBody = CreateFormRequest
 
+// LoginWithEmailJSONRequestBody defines body for LoginWithEmail for application/json ContentType.
+type LoginWithEmailJSONRequestBody = EmailLoginRequest
+
 // RegisterUserJSONRequestBody defines body for RegisterUser for application/json ContentType.
 type RegisterUserJSONRequestBody = RegisterUserRequest
 
@@ -341,6 +350,9 @@ type ServerInterface interface {
 	// CompleteGoogleLogin Finaliza o login com Google
 	// (GET /auth/google/callback)
 	CompleteGoogleLogin(w http.ResponseWriter, r *http.Request, params CompleteGoogleLoginParams)
+	// LoginWithEmail Autentica com e-mail e senha
+	// (POST /auth/login)
+	LoginWithEmail(w http.ResponseWriter, r *http.Request)
 	// Logout Encerra a sessao atual
 	// (POST /auth/logout)
 	Logout(w http.ResponseWriter, r *http.Request, params LogoutParams)
@@ -419,6 +431,12 @@ func (_ Unimplemented) BeginGoogleLogin(w http.ResponseWriter, r *http.Request) 
 // CompleteGoogleLogin Finaliza o login com Google
 // (GET /auth/google/callback)
 func (_ Unimplemented) CompleteGoogleLogin(w http.ResponseWriter, r *http.Request, params CompleteGoogleLoginParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// LoginWithEmail Autentica com e-mail e senha
+// (POST /auth/login)
+func (_ Unimplemented) LoginWithEmail(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -851,6 +869,20 @@ func (siw *ServerInterfaceWrapper) CompleteGoogleLogin(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
+// LoginWithEmail operation middleware
+func (siw *ServerInterfaceWrapper) LoginWithEmail(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.LoginWithEmail(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // Logout operation middleware
 func (siw *ServerInterfaceWrapper) Logout(w http.ResponseWriter, r *http.Request) {
 
@@ -1145,6 +1177,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/auth/register", wrapper.RegisterUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/login", wrapper.LoginWithEmail)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/auth/google/callback", wrapper.CompleteGoogleLogin)
@@ -1648,6 +1683,64 @@ func (response CompleteGoogleLogin400JSONResponse) VisitCompleteGoogleLoginRespo
 	return err
 }
 
+type LoginWithEmailRequestObject struct {
+	Body *LoginWithEmailJSONRequestBody
+}
+
+type LoginWithEmailResponseObject interface {
+	VisitLoginWithEmailResponse(w http.ResponseWriter) error
+}
+
+type LoginWithEmail200ResponseHeaders struct {
+	SetCookie string
+}
+
+type LoginWithEmail200JSONResponse struct {
+	Body    User
+	Headers LoginWithEmail200ResponseHeaders
+}
+
+func (response LoginWithEmail200JSONResponse) VisitLoginWithEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Set-Cookie", fmt.Sprint(response.Headers.SetCookie))
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LoginWithEmail401JSONResponse ErrorResponse
+
+func (response LoginWithEmail401JSONResponse) VisitLoginWithEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LoginWithEmail422JSONResponse ErrorResponse
+
+func (response LoginWithEmail422JSONResponse) VisitLoginWithEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type LogoutRequestObject struct {
 	Params LogoutParams
 }
@@ -1936,6 +2029,9 @@ type StrictServerInterface interface {
 	// CompleteGoogleLogin Finaliza o login com Google
 	// (GET /auth/google/callback)
 	CompleteGoogleLogin(ctx context.Context, request CompleteGoogleLoginRequestObject) (CompleteGoogleLoginResponseObject, error)
+	// LoginWithEmail Autentica com e-mail e senha
+	// (POST /auth/login)
+	LoginWithEmail(ctx context.Context, request LoginWithEmailRequestObject) (LoginWithEmailResponseObject, error)
 	// Logout Encerra a sessao atual
 	// (POST /auth/logout)
 	Logout(ctx context.Context, request LogoutRequestObject) (LogoutResponseObject, error)
@@ -2249,6 +2345,37 @@ func (sh *strictHandler) CompleteGoogleLogin(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+// LoginWithEmail operation middleware
+func (sh *strictHandler) LoginWithEmail(w http.ResponseWriter, r *http.Request) {
+	var request LoginWithEmailRequestObject
+
+	var body LoginWithEmailJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.LoginWithEmail(ctx, request.(LoginWithEmailRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "LoginWithEmail")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LoginWithEmailResponseObject); ok {
+		if err := validResponse.VisitLoginWithEmailResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Logout operation middleware
 func (sh *strictHandler) Logout(w http.ResponseWriter, r *http.Request, params LogoutParams) {
 	var request LogoutRequestObject
@@ -2444,47 +2571,49 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"7FvrUhs7En4Vlfb82MsQDyY5J8d/togDxLWEUBi2tirFUmKmsZXMSBNJQ+BQfph9ln2xLUlztzweG3Cc",
-	"LX5hxrr05evuTz3yAw54nHAGTEk8eMAymEJMzMf9MKbskIt4nF7HVErKmXlOwpAqyhmJTgVPQCgKEg9u",
-	"SCTBw0nl0QO+4SK+omH+kSg8wJSpX19jD6v7BOy/MAGBZx6WUTrRQ7NvpBKUTcwXdQGogth8+EXADR7g",
-	"P/VKHXqZAj0jfSm5XiZblwhB7s3/VEXg2HDmYQHfUiogxIPPhRL5hEzQuliXxfL8+gsESq/fFGE12xEm",
-	"v4NYW+F9M92ldiCAKAivtDcqfgmJgh1FYyh9U3qgow8bljNGq2znFUp1MFemwIqAoxCF3RFnh9vn7dbV",
-	"cXCoR5/rwTMPR+QaIidab0mU6vXmcJTLVts3Xymf57LMcMppACuaohAwpuwY2ERN8WDXWyxu+7iGLnZS",
-	"LrtTZuP2wmwrCh9wdkMnqSCqNXCUSMGxdwgyEDTJ58bkrlDM932HDUpblUP7b954y2xXmqTAwTXnEZBK",
-	"vlkJVw0zNxBSfOU1DNTugDP4loJUK7pgsRH7biMaUHfPV02AzIy1R3bq7nzayqtDi4v6Hk6IUiAYHuB/",
-	"fyY7f/g7v1/+7c9/H+wU//zlr7+4ElxRC9qXb4+KRn3IDLLYOWWyW89Fq5aI5dWhoVBbuj4QgoszkAln",
-	"ElYO7xCcuTMGKcmkQ1E2K5TjXQLWQ2vwgIGlsZ47/vDp7Pzq/OBf59jDx59OjvLPJxcf3x2cYQ+PRydH",
-	"xwdXww+fRsMD7OGPF8fno9Pqk7P989HJUWXfUgdDmRRRtT3fn+0f6i1OL94dj8YfDt5jDw/3T4YHxwfv",
-	"F6+SxjER96sad4363gj2det/G4fLLbIsG1rTtdAzD6dJuKKGLmLSZHNm3wZfqezkgtgHIJGarhkEesNU",
-	"VkHCvzqg0BA9m+WS5mMaKZpEYOnCsFsJdUPIrLBCLrcEpZbC+/MpPCZ3VxIiCFRO5WPKaKyV33WBKaZs",
-	"0Xh/KfnMdXBZ6iSNr0E8xkIxuatAk5n1MpGdz6WCxLj6LohSSW/hY66J5TAOxfLJM4cCp+l1RAMdLo+r",
-	"6o8t4qUcRRFvOv3xqaPjOc0V1C0luCn6DySo66fbxaeQ56am1tqP4KdnRFE2eYIYjMldlkP8Shz1FySU",
-	"ZVmnoaaeYRKXWweYUKlAXEgQ61E4iAmNas62T7wqEd3ru/g2I3GTse7+6i9hrJohS/mdi7Ax9bd+bebb",
-	"ZXXI7O4V0harusw0pmyytWVphbKx2eZEhz7C4pZBKao9aoQbIJFP0yRyaXMOd+qRmeIqypDdhXQ4xroJ",
-	"x5ykOhM8WQpYvy7kuaFDxawF8rzxdWGGIBVU3Y91WOXlj3+lsJ9aI+msmj3KFxzgGxJ945q/2eZnGXYJ",
-	"/QfouNP6sBs+x0rw/ukIJUQQFAhKhIcSU6mJQICEodohCKSNkEZEUC5RSBmJacDlq4IBDPCh2R/toDGk",
-	"SOo0HRMU6iVuKXyXCBBh//1PRCVIHUkgbI8W+692X/nahjwBRhKKB3jvlf9qzyQ5NTXq90gYU9bTMpj/",
-	"J2DCRHvVwHMU4gE+plIdmhF6piAxKHNY/9zVYDaNudx4qf1oDx1m/77vZ6REAbMlKEm0zbQwvS/SBky5",
-	"XqfsWT2BzjcKmizGHFgLh3CUylR/1jNf+7srSdcmVL3r4BBjDFISjkgqgSlAPEVwl1BBQlLDsnFDFcWf",
-	"L7VVZX7iNt4jiMs60Aq9EEm1MjQgIdegIxPtWWz9fanLLJcOTJRNr2cCheEg73h4/2QWn+8jzup5RHPc",
-	"2Rwgn87lNRy24c7ki3C7IKdF+X2DokTpBH0hKFU0on/kxuj3NyfBe7ihjAaE62ApYwdRdksiumoUDgUl",
-	"KI2rC+XJHgU85kgQGaRs6orBmVfL070H/WcUzmzBicC2o+rx+d48b4lPXQIq0WlWxM1oqEZpBzr0HPXg",
-	"9XxZrQSK6ULQkKOIT2hAYo3brQub15sTpWIaRjgCprcVJnxWQeuBMWvVqE3sdq8fTkpxBOr/AJv+kzm2",
-	"0gZr96qhkxDqvPSC80fj/F0qA9IJ2jXDO2lS6oD5hem6/5xI3xoC5v8AAkZUSiq84yXKmlH2o+mgtksl",
-	"aLOT9U9PE/cz3DVyEsTr8MOesYo0nQ33Ke7UDngpxWsliTroXnLED84RB1LpxGBSt5ElARFTBbmfDGVa",
-	"JRgtKXuiWGxc/WxttFXvqb6EZeVWaNM4DhQYhEhFZD0fv4Too8mybSQSaXvX1sRrnwtNnKRq2ptwPrEv",
-	"xZ0h8Q4mlB2ZMcd8Yt5h1iC25/823yA4g5AKCChnxPJ2juwS2MNTIGF21eyYB8U7mA6RkwrqvI8zBrUz",
-	"tEHTulBzpp77xt/bHA72c49otmINYgBRvOLO2Urh8hGjAdXmi7TtUcDj0pC5RzVY7LL2DXnTtb2ARNE1",
-	"Cb4u9PGQx0kECupudqW9bymI+zI1ZXfnFpvYc8/Lb0itPBG0iTtNXJBFuTbMSjl0z++3AzwEdMsjVSD9",
-	"RhgwhVuH9ddPWA2WYn2YgS7n4byB7EPKLNFeE9sRn3B74ncz62P7/QZemDkapFntARaAMFFdg8L6Plyp",
-	"hWg3RwTJrBJqXtbJtiK7jLLYutXrKvh5mhWuGzEbfl9ktHNg+yKrsAEJiTSFHEGj3D6JuzfN33diQiN9",
-	"yi8V2/xxnoTc8JpMhuIgz2UjgwwzITUDyjmPTiJg1QBEbfGUaR4CncCfJ4FFxfIIlJ48LnLFlr2RXwfQ",
-	"BVfOIUx+2rftZ6C4YLqstPNgJwCWX8PIGjYQ5vcxtvr2RNEgacaO805CORqFVGtFb4FKS2uKI8eCo0R2",
-	"2JZROpm1hU7lPUuXg3V2+bZ70tyOd0RmIN+ec6YOJ9OQKRtms2WvYYqxKIGIo8wTy3zfbLO0XV6p/KD1",
-	"+bDwXG9R5n9xtWFyMn8vs7UZI0l0S+RWQ3LDTKO0Tf6qoJkl/2meIrDGa2u7lFq4Q2Rqft7TlhjtD4Dw",
-	"M6avxk+MXP2J0xECdE1YwLWKYbMU4I03TE5HiLJCgkiDRkKMSABSckS4FbZJDDmTqT6QEyRJahRB+6ej",
-	"imvG91JBrH1jqIW4zdNOY/v4mho2EvHAHJ1SEeEBniqVDHo983DKpRq89d/6WKebbP0Hd2Pc+Nz0DKJS",
-	"pCy5ZRLNvIe2nhEUZ7kwpoxq9qvoLSmXabCa+eWOQAALqLlT0ljG+LzCB8pVLZJnl7P/BQAA//8=",
+	"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",
+	"8d8AAAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

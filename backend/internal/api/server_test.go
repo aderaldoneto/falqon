@@ -9,6 +9,7 @@ import (
 
 	formauth "github.com/aderaldo/falqon/backend/internal/auth"
 	formdomain "github.com/aderaldo/falqon/backend/internal/forms"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type databaseHealthCheckerStub struct{ err error }
@@ -43,6 +44,7 @@ type authRepositoryStub struct {
 	expiresAt    time.Time
 	createError  error
 	userError    error
+	passwordHash string
 }
 
 type formRepositoryStub struct {
@@ -124,6 +126,10 @@ func (stub authRepositoryStub) CreateEmailUser(
 	string,
 ) (formauth.User, error) {
 	return stub.user, stub.createError
+}
+
+func (stub authRepositoryStub) UserByEmail(context.Context, string) (formauth.User, string, error) {
+	return stub.user, stub.passwordHash, stub.userError
 }
 
 func (stub authRepositoryStub) UpsertGoogleUser(
@@ -312,6 +318,44 @@ func TestRegisterUserRejectsDuplicateEmail(t *testing.T) {
 	}
 	if _, ok := response.(RegisterUser409JSONResponse); !ok {
 		t.Fatalf("RegisterUser() response = %T, want RegisterUser409JSONResponse", response)
+	}
+}
+
+func TestLoginWithEmailCreatesSession(t *testing.T) {
+	t.Parallel()
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("GenerateFromPassword() error = %v", err)
+	}
+	server := newAuthTestServer(googleAuthenticatorStub{}, authRepositoryStub{
+		user:         formauth.User{ID: 1, Name: "Usuário", Email: "user@falqon.com.br"},
+		passwordHash: string(passwordHash), sessionToken: "session-token", expiresAt: time.Now().Add(time.Hour),
+	})
+	response, err := server.LoginWithEmail(context.Background(), LoginWithEmailRequestObject{Body: &LoginWithEmailJSONRequestBody{
+		Email: "user@falqon.com.br", Password: "123456",
+	}})
+	if err != nil {
+		t.Fatalf("LoginWithEmail() error = %v", err)
+	}
+	loggedIn, ok := response.(LoginWithEmail200JSONResponse)
+	if !ok || loggedIn.Body.Id != 1 || !strings.Contains(loggedIn.Headers.SetCookie, "falqon_session=session-token") {
+		t.Fatalf("LoginWithEmail() response = %#v, want authenticated user", response)
+	}
+}
+
+func TestLoginWithEmailRejectsInvalidCredentials(t *testing.T) {
+	t.Parallel()
+
+	server := newAuthTestServer(googleAuthenticatorStub{}, authRepositoryStub{userError: formauth.ErrUnauthenticated})
+	response, err := server.LoginWithEmail(context.Background(), LoginWithEmailRequestObject{Body: &LoginWithEmailJSONRequestBody{
+		Email: "unknown@example.com", Password: "wrong",
+	}})
+	if err != nil {
+		t.Fatalf("LoginWithEmail() error = %v", err)
+	}
+	if _, ok := response.(LoginWithEmail401JSONResponse); !ok {
+		t.Fatalf("LoginWithEmail() response = %T, want LoginWithEmail401JSONResponse", response)
 	}
 }
 

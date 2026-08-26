@@ -66,6 +66,23 @@ func (repository *Repository) CreateEmailUser(
 	return user, nil
 }
 
+func (repository *Repository) UserByEmail(ctx context.Context, email string) (User, string, error) {
+	var user User
+	var passwordHash *string
+	err := repository.database.QueryRow(ctx, `
+		SELECT id, name, email, password_hash
+		FROM users
+		WHERE email = $1 AND deleted_at IS NULL
+	`, email).Scan(&user.ID, &user.Name, &user.Email, &passwordHash)
+	if errors.Is(err, pgx.ErrNoRows) || err == nil && passwordHash == nil {
+		return User{}, "", ErrUnauthenticated
+	}
+	if err != nil {
+		return User{}, "", fmt.Errorf("find user by email: %w", err)
+	}
+	return user, *passwordHash, nil
+}
+
 func (repository *Repository) UpsertGoogleUser(
 	ctx context.Context,
 	identity GoogleIdentity,

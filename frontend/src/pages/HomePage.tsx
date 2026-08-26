@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { type FormEvent, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
@@ -9,10 +9,11 @@ import {
   Divider,
   Paper,
   Stack,
+  TextField,
   Typography,
   alpha,
 } from '@mui/material'
-import { getAuthSession, logout } from '../api/generated'
+import { getAuthSession, loginWithEmail, logout } from '../api/generated'
 import { Link as RouterLink } from 'react-router-dom'
 
 const sessionQueryKey = ['auth', 'session'] as const
@@ -45,6 +46,9 @@ export function HomePage() {
   const queryClient = useQueryClient()
   const apiURL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080'
   const authError = useMemo(() => new URLSearchParams(window.location.search).get('auth_error'), [])
+  const [showEmailLogin, setShowEmailLogin] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
 
   const session = useQuery({
     queryKey: sessionQueryKey,
@@ -63,6 +67,23 @@ export function HomePage() {
       await queryClient.invalidateQueries({ queryKey: sessionQueryKey })
     },
   })
+
+  const emailLoginMutation = useMutation({
+    mutationFn: async () => {
+      const response = await loginWithEmail({ body: { email, password } })
+      if (response.error) throw new Error('E-mail ou senha incorretos.')
+      return response.data
+    },
+    onSuccess: (user) => {
+      queryClient.setQueryData(sessionQueryKey, user)
+      setPassword('')
+    },
+  })
+
+  const submitEmailLogin = (event: FormEvent) => {
+    event.preventDefault()
+    emailLoginMutation.mutate()
+  }
 
   const beginGoogleLogin = () => {
     window.location.assign(`${apiURL}/auth/google`)
@@ -273,11 +294,64 @@ export function HomePage() {
                     Entre para criar seus formulários de review e acompanhar o que sua audiência tem
                     a dizer.
                   </Typography>
+                  {!showEmailLogin ? (
+                    <Button
+                      fullWidth
+                      onClick={() => setShowEmailLogin(true)}
+                      size="large"
+                      variant="contained"
+                    >
+                      Entrar com e-mail
+                    </Button>
+                  ) : (
+                    <Stack component="form" onSubmit={submitEmailLogin} spacing={2}>
+                      <TextField
+                        autoComplete="email"
+                        autoFocus
+                        fullWidth
+                        label="E-mail"
+                        onChange={(event) => setEmail(event.target.value)}
+                        required
+                        type="email"
+                        value={email}
+                      />
+                      <TextField
+                        autoComplete="current-password"
+                        fullWidth
+                        label="Senha"
+                        onChange={(event) => setPassword(event.target.value)}
+                        required
+                        type="password"
+                        value={password}
+                      />
+                      {emailLoginMutation.isError && (
+                        <Alert severity="error">{emailLoginMutation.error.message}</Alert>
+                      )}
+                      <Stack direction="row" spacing={1}>
+                        <Button
+                          color="inherit"
+                          disabled={emailLoginMutation.isPending}
+                          fullWidth
+                          onClick={() => setShowEmailLogin(false)}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          disabled={emailLoginMutation.isPending}
+                          fullWidth
+                          type="submit"
+                          variant="contained"
+                        >
+                          {emailLoginMutation.isPending ? 'Entrando...' : 'Confirmar login'}
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  )}
                   <Button
                     fullWidth
                     onClick={beginGoogleLogin}
                     size="large"
-                    variant="contained"
+                    variant="outlined"
                     sx={{ py: 1.35 }}
                   >
                     Continuar com Google
@@ -287,7 +361,7 @@ export function HomePage() {
                     fullWidth
                     size="large"
                     to="/register"
-                    variant="outlined"
+                    variant="text"
                   >
                     Cadastrar
                   </Button>

@@ -35,10 +35,42 @@ type googleAuthenticator interface {
 
 type authRepository interface {
 	CreateEmailUser(context.Context, string, string, string) (formauth.User, error)
+	UserByEmail(context.Context, string) (formauth.User, string, error)
 	UpsertGoogleUser(context.Context, formauth.GoogleIdentity) (formauth.User, error)
 	CreateSession(context.Context, int64, time.Duration) (string, time.Time, error)
 	UserBySession(context.Context, string) (formauth.User, error)
 	RevokeSession(context.Context, string) error
+}
+
+func (server *Server) LoginWithEmail(
+	ctx context.Context,
+	request LoginWithEmailRequestObject,
+) (LoginWithEmailResponseObject, error) {
+	if request.Body == nil {
+		return LoginWithEmail422JSONResponse{Code: "invalid_login", Message: "email and password are required"}, nil
+	}
+	email := strings.ToLower(strings.TrimSpace(string(request.Body.Email)))
+	password := request.Body.Password
+	parsedEmail, emailError := mail.ParseAddress(email)
+	if emailError != nil || parsedEmail.Address != email || len(email) > 320 || len(password) == 0 || len(password) > 72 {
+		return LoginWithEmail422JSONResponse{Code: "invalid_login", Message: "email or password is invalid"}, nil
+	}
+
+	user, passwordHash, err := server.authRepository.UserByEmail(ctx, email)
+	if errors.Is(err, formauth.ErrUnauthenticated) || err == nil && bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password)) != nil {
+		return LoginWithEmail401JSONResponse{Code: "invalid_credentials", Message: "email or password is incorrect"}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	token, expiresAt, err := server.authRepository.CreateSession(ctx, user.ID, server.config.SessionDuration)
+	if err != nil {
+		return nil, err
+	}
+	return LoginWithEmail200JSONResponse{
+		Body:    User{Id: user.ID, Name: user.Name, Email: openapi_types.Email(user.Email)},
+		Headers: LoginWithEmail200ResponseHeaders{SetCookie: server.sessionCookie(token, expiresAt).String()},
+	}, nil
 }
 
 type formRepository interface {
