@@ -29,4 +29,19 @@ Para encerrar os containers:
 docker compose down
 ```
 
-Terminar de documentar depois
+## Banco de dados e migrations
+
+Migrations:
+
+```bash
+docker compose exec api sh -c 'goose -dir ./migrations postgres "$DATABASE_URL" up'
+```
+
+Consulte o status ou reverta a migration mais recente com:
+
+```bash
+docker compose exec api sh -c 'goose -dir ./migrations postgres "$DATABASE_URL" status'
+docker compose exec api sh -c 'goose -dir ./migrations postgres "$DATABASE_URL" down'
+```
+
+As migrations ficam em `backend/migrations`. 
