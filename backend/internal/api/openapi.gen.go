@@ -89,6 +89,29 @@ func (e HealthResponseStatus) Valid() bool {
 	}
 }
 
+// AdminFormSubmissions defines model for AdminFormSubmissions.
+type AdminFormSubmissions struct {
+	FormId      int64             `json:"form_id"`
+	Slug        string            `json:"slug"`
+	Submissions []AdminSubmission `json:"submissions"`
+	Title       string            `json:"title"`
+}
+
+// AdminSubmission defines model for AdminSubmission.
+type AdminSubmission struct {
+	Answers   []AdminSubmissionAnswer `json:"answers"`
+	CreatedAt time.Time               `json:"created_at"`
+	Id        int64                   `json:"id"`
+}
+
+// AdminSubmissionAnswer defines model for AdminSubmissionAnswer.
+type AdminSubmissionAnswer struct {
+	FieldId   int64         `json:"field_id"`
+	FieldType FormFieldType `json:"field_type"`
+	Label     string        `json:"label"`
+	Value     interface{}   `json:"value"`
+}
+
 // Choice defines model for Choice.
 type Choice struct {
 	Label string `json:"label"`
@@ -239,6 +262,11 @@ type PublishFormParams struct {
 	FalqonSession *string `form:"falqon_session,omitempty" json:"falqon_session,omitempty"`
 }
 
+// ListFormSubmissionsParams defines parameters for ListFormSubmissions.
+type ListFormSubmissionsParams struct {
+	FalqonSession *string `form:"falqon_session,omitempty" json:"falqon_session,omitempty"`
+}
+
 // CompleteGoogleLoginParams defines parameters for CompleteGoogleLogin.
 type CompleteGoogleLoginParams struct {
 	Code        *string `form:"code,omitempty" json:"code,omitempty"`
@@ -277,6 +305,9 @@ type ServerInterface interface {
 	// PublishForm Publica um formulario em rascunho
 	// (POST /admin/forms/{formId}/publish)
 	PublishForm(w http.ResponseWriter, r *http.Request, formId int64, params PublishFormParams)
+	// ListFormSubmissions Lista as respostas de um formulario do usuario autenticado
+	// (GET /admin/forms/{formId}/submissions)
+	ListFormSubmissions(w http.ResponseWriter, r *http.Request, formId int64, params ListFormSubmissionsParams)
 	// BeginGoogleLogin Inicia o login com Google
 	// (GET /auth/google)
 	BeginGoogleLogin(w http.ResponseWriter, r *http.Request)
@@ -322,6 +353,12 @@ func (_ Unimplemented) CreateForm(w http.ResponseWriter, r *http.Request, params
 // PublishForm Publica um formulario em rascunho
 // (POST /admin/forms/{formId}/publish)
 func (_ Unimplemented) PublishForm(w http.ResponseWriter, r *http.Request, formId int64, params PublishFormParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListFormSubmissions Lista as respostas de um formulario do usuario autenticado
+// (GET /admin/forms/{formId}/submissions)
+func (_ Unimplemented) ListFormSubmissions(w http.ResponseWriter, r *http.Request, formId int64, params ListFormSubmissionsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -487,6 +524,50 @@ func (siw *ServerInterfaceWrapper) PublishForm(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PublishForm(w, r, formId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListFormSubmissions operation middleware
+func (siw *ServerInterfaceWrapper) ListFormSubmissions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "formId" -------------
+	var formId int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "formId", chi.URLParam(r, "formId"), &formId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "formId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListFormSubmissionsParams
+
+	{
+		var cookie *http.Cookie
+
+		if cookie, err = r.Cookie("falqon_session"); err == nil {
+			var value string
+			err = runtime.BindStyledParameterWithOptions("simple", "falqon_session", cookie.Value, &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationCookie, Explode: true, Required: false, Type: "string", Format: ""})
+			if err != nil {
+				siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "falqon_session", Err: err})
+				return
+			}
+			params.FalqonSession = &value
+
+		}
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListFormSubmissions(w, r, formId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -880,6 +961,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/admin/forms/{formId}/publish", wrapper.PublishForm)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/admin/forms/{formId}/submissions", wrapper.ListFormSubmissions)
+	})
 
 	return r
 }
@@ -1046,6 +1130,57 @@ func (response PublishForm409JSONResponse) VisitPublishFormResponse(w http.Respo
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListFormSubmissionsRequestObject struct {
+	FormId int64 `json:"formId"`
+	Params ListFormSubmissionsParams
+}
+
+type ListFormSubmissionsResponseObject interface {
+	VisitListFormSubmissionsResponse(w http.ResponseWriter) error
+}
+
+type ListFormSubmissions200JSONResponse AdminFormSubmissions
+
+func (response ListFormSubmissions200JSONResponse) VisitListFormSubmissionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListFormSubmissions401JSONResponse ErrorResponse
+
+func (response ListFormSubmissions401JSONResponse) VisitListFormSubmissionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListFormSubmissions404JSONResponse ErrorResponse
+
+func (response ListFormSubmissions404JSONResponse) VisitListFormSubmissionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1374,6 +1509,9 @@ type StrictServerInterface interface {
 	// PublishForm Publica um formulario em rascunho
 	// (POST /admin/forms/{formId}/publish)
 	PublishForm(ctx context.Context, request PublishFormRequestObject) (PublishFormResponseObject, error)
+	// ListFormSubmissions Lista as respostas de um formulario do usuario autenticado
+	// (GET /admin/forms/{formId}/submissions)
+	ListFormSubmissions(ctx context.Context, request ListFormSubmissionsRequestObject) (ListFormSubmissionsResponseObject, error)
 	// BeginGoogleLogin Inicia o login com Google
 	// (GET /auth/google)
 	BeginGoogleLogin(ctx context.Context, request BeginGoogleLoginRequestObject) (BeginGoogleLoginResponseObject, error)
@@ -1518,6 +1656,33 @@ func (sh *strictHandler) PublishForm(w http.ResponseWriter, r *http.Request, for
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PublishFormResponseObject); ok {
 		if err := validResponse.VisitPublishFormResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListFormSubmissions operation middleware
+func (sh *strictHandler) ListFormSubmissions(w http.ResponseWriter, r *http.Request, formId int64, params ListFormSubmissionsParams) {
+	var request ListFormSubmissionsRequestObject
+
+	request.FormId = formId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListFormSubmissions(ctx, request.(ListFormSubmissionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListFormSubmissions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListFormSubmissionsResponseObject); ok {
+		if err := validResponse.VisitListFormSubmissionsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1746,43 +1911,44 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"1FpZUyM5Ev4rCu087GHabsPM9PhlA9yGdqybJjBsbEQHS4iqxFZ3lVStg4Eh/N83UqrLZfni8LBPmLKU",
-	"yuPLLzNVfqSRTDMpQBhNe49UR1NImfvYn0oeAX5iccwNl4IlZ0pmoAwHTXu3LNHQolnt0SNN2A0k+CHl",
-	"YgRiYqa0975FzUMGtEe1UVxM6KxF71hiYe26WYsq+GG5gpj2vuabWvkhV+VyefMNIoNi+wqYgWOp0mMO",
-	"Sbyl8pEUt3xiFcP1y/caZSFwdgw6Ujwr9qbsvjSs0+kEfFD5qlra/fnn1jrfVS55LL68kTIBJvBb/+SR",
-	"/qTglvboX9pVgNt5dNulgy5wcdPNTkKhXu2rVsNBqwNwDj8saLNlCJY7sRt24i2a4bZyA6leZ3kTIDPn",
-	"7aHfWjmbKcUe8Eud2MmaEHVbNGPGgBK0R//7le390dn77eoff/1nb6/8529//4kGlDfcJLBe/Oqs8EJy",
-	"VUuHLA/O2N6kXGsuxdNCxIT+HdTmLq/OO3Q7K5AWbm4YVBwQMmGglFTnoDMpNGyd3jHUcqYKQwpas0no",
-	"u4ZmTkK1PqTgfGr1HikIm+Le8acv5xfXF4P/XNAWHX05PSk+n15+Phqc0xYdD09PRoPr/qcvw/6Atujn",
-	"y9HF8Kz+5PzwYnh6Uju3sgHPHRtm5s78eH54jEecXR6NhuNPg4+0RfuHp/3BaPBxuRSbpkw9bOtch634",
-	"mjk43UqV4icaMwN7hqcQgn8j2Re+5/GcLC7MLweVHC4MTDyciixdkKALj6xjQ++6ekouyLJZvKWFDfRw",
-	"pNBGtnoFW3X3zZ0UgtgnYImZPjEJ8ECr6yCR3wNQaKie7wpp89kmhmcJ+Hahv1kJDUPISdiCy32DMkfh",
-	"3UUKT9n9tYYEIlRD5z0HT9H49yEwpVwsW99ZXN9kiNyGkKdObXoD6jkeStl9DZrCyctVDj7XBjIX6vso",
-	"sZrfwefCEt/DBAwrNs8CBpzZm4RHmC7Pq+rPLeKVHmURbwb9+dSxjAg2SOoVJbip+p/YoD6dbsvGdeet",
-	"qff2M/rTc2a4mLxADqbsPueQTi2PuksIZR3rNMzEHY64wjbAhGsD6lKDeloLBynjyVyw/ZNWvRHd74b6",
-	"bcHSZsf6/pfOmo4VO2Stf5cqbmz9tTu388O6OuROb5XallJDbhpzMXmzZWmLsrHQP2+nviOj641zuxjM",
-	"mxqWYoolq1X1o0a8gyZyQ8tCRFI7LmTNBdybZzLFdZIje5OmI7A23HAsaIpM8GIU8PS6UHDDBhVzLpEX",
-	"nY+FGSKruHkYY1oV5U9+53BovZOQVfNHhcAevWXJD4n9m0NhpSXL+L8A8w7tEbdyoSuhh2dDkjHFSKQ4",
-	"Uy2SuUrNFAGiXKsdgyLoBJswxaUmMRcs5ZHU78oOoEeP3fkEqxg5sjzBTYdnQ8waUNqf1Hn3/l0H/SUz",
-	"ECzjtEf333Xe7TtCM1NnapvFKRdtPM/9PwGXEhhBB8VhTHt0xLU5ditwp2IpGDeYf93UOZ6yQiG7wpj5",
-	"AcOd3+108gbEgPDlJsvQP6hM+5v2yVHJ24gp69Pm4qVAs2Nxw2npfEmstvgZdx503m+l3Sql5m8YAmqM",
-	"cfqXhFkNwgCRlsB9xhWL2RxuXRjqiP16hV7VxXTtoseI1POgKu0izKIxPGKxRICxCUaW+nhfYUmVOoCJ",
-	"6oLrlUDh+o0jGT+8mMcX7wxn85yB/exsAZAvF/I5HK7CneOG+G1BDlX5bYeqJHZCvjFiDU/4H4Uzut3d",
-	"afARbrngEZOYLFXuEC7uWMK3zcK+4ozYtC6oIHYSyVQSxXRkxTSUg7PWHE+3H/HPMJ61Xe3QrkqFs/TM",
-	"L1iRplgJaknqBNNmUtSTdYMO6M8vCy+ThXlpfoOJeLA7VWr+EEwSEHisKp2yQ0oYaMNiSZixLHG6ZKBS",
-	"bqCIU8TkdjnpL0maaQnp2ly0ZtqeSDnxFzfBnukIJlycuDUjOXFz9hyi9zu/LvaG5xBzBRF21r5HlMSL",
-	"oC06BRbnr0NGMirnhA0S1SoevDMeg9nr+xxdKai5E/f+3NnfXeAPiw4Fydg7xMW/vIYpyLiM7FDwiKP7",
-	"EvQ9EmzlyCKiiAkv1t/iNEPbjliS3LDo+9IY92WaJWBgPswhlv1hQT1UTJi/31nu4lZ4X3GLv/VGQBdv",
-	"tHEJaUt0zFaUvd/prgZ4DOROJqZE+q1yYIrfHNYPXrD4rMV6Pwdd0WbIBrKPuWDYED0V24mcSGuWdwwj",
-	"//0OBr2DRXjkZQ9EBMpl9RwUnh7DbYrCwB9OGNF5EcZ6s5FvVX5huty79StV+jpTTujWdsdzjrMugO3L",
-	"fOKMWMy06yEINMbPFwn3rvuSvZTxBIeVyrDdTyssxrEeCh3KOUXqBoP0cyWx7SnuAJBEwJsBhPviqW2R",
-	"AhuBvyCBZcXyBAxuHpdc8cZukp4C6LJNLyDM/m9vic7BSCWwrKy+FwoCIB9LdWIns1UAqL3Y3WQazV9z",
-	"bp76r4mBmu6bTI3y7QxqCAo3LlXj7BwhHFm9MASVa0kGiSR5JELDUD32bV2+mNHLi2Dz52GviIXXukRc",
-	"/G3bjkvs4huwACIcWrRhmmiW3DH9piG543pZ+aa4z2vWyX+7pwS88/zLGbchhmXJsiRFpu6HVKuI0f/U",
-	"ir4ifTV+zBWass+GBMgNE5FEE2PfUHDcwO+AO/Tsduw/GxIuSg0SBI2GlLAItJaESa9ss72RQlscKxnR",
-	"zDpD8jdjRWjGD9pAirFxBVLdFbTTOD694a6mJjJyA4BVCe3RqTFZr912D6dSm96HzocORbrJ5T+Gr61c",
-	"zN3km1Qq5eSWa4RD+IqbDygnkjjlgmMPZ/gdq8Q0avOiuBNQICLOUhCmIcbFvPaGqJLqkTy7mv0vAAD/",
-	"/w==",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

@@ -8,6 +8,7 @@ import { RegisterPage } from './pages/RegisterPage'
 import { FormsAdminPage } from './pages/FormsAdminPage'
 import { FormEditorPage } from './pages/FormEditorPage'
 import { PublicFormPage } from './pages/PublicFormPage'
+import { FormResponsesPage } from './pages/FormResponsesPage'
 
 const queryClient = new QueryClient()
 const theme = createTheme({
@@ -40,6 +41,7 @@ const router = createBrowserRouter([
   { path: '/forms/:slug', element: <PublicFormPage /> },
   { path: '/admin/forms', element: <FormsAdminPage /> },
   { path: '/admin/forms/new', element: <FormEditorPage /> },
+  { path: '/admin/forms/:formId/responses', element: <FormResponsesPage /> },
 ])
 
 createRoot(document.getElementById('root')!).render(

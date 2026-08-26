@@ -216,9 +216,10 @@ export function FormsAdminPage() {
                         </Button>
                       )}
                       {form.state === 'PUBLISHED' && (
-                        <Button component={RouterLink} to={`/forms/${form.slug}`} variant="outlined">
-                          Abrir formulário
-                        </Button>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                          <Button component={RouterLink} fullWidth to={`/forms/${form.slug}`} variant="outlined">Abrir formulário</Button>
+                          <Button component={RouterLink} fullWidth to={`/admin/forms/${form.id}/responses`} variant="contained">Ver respostas</Button>
+                        </Stack>
                       )}
                     </Stack>
                   </Paper>

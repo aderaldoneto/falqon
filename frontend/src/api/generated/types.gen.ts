@@ -70,6 +70,26 @@ export type SubmissionCreated = {
   created_at: string;
 };
 
+export type AdminFormSubmissions = {
+  form_id: number;
+  title: string;
+  slug: string;
+  submissions: Array<AdminSubmission>;
+};
+
+export type AdminSubmission = {
+  id: number;
+  created_at: string;
+  answers: Array<AdminSubmissionAnswer>;
+};
+
+export type AdminSubmissionAnswer = {
+  field_id: number;
+  field_type: FormFieldType;
+  label: string;
+  value: unknown;
+};
+
 export type CreateFormRequest = {
   title: string;
   slug: string;
@@ -416,3 +436,36 @@ export type PublishFormResponses = {
 
 export type PublishFormResponse =
   PublishFormResponses[keyof PublishFormResponses];
+
+export type ListFormSubmissionsData = {
+  body?: never;
+  path: {
+    formId: number;
+  };
+  query?: never;
+  url: "/admin/forms/{formId}/submissions";
+};
+
+export type ListFormSubmissionsErrors = {
+  /**
+   * Sessao ausente ou expirada
+   */
+  401: ErrorResponse;
+  /**
+   * Formulario nao encontrado
+   */
+  404: ErrorResponse;
+};
+
+export type ListFormSubmissionsError =
+  ListFormSubmissionsErrors[keyof ListFormSubmissionsErrors];
+
+export type ListFormSubmissionsResponses = {
+  /**
+   * Respostas do formulario
+   */
+  200: AdminFormSubmissions;
+};
+
+export type ListFormSubmissionsResponse =
+  ListFormSubmissionsResponses[keyof ListFormSubmissionsResponses];

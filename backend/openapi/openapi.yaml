@@ -369,6 +369,45 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /admin/forms/{formId}/submissions:
+    get:
+      operationId: listFormSubmissions
+      summary: Lista as respostas de um formulario do usuario autenticado
+      tags:
+        - Forms
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: falqon_session
+          in: cookie
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Respostas do formulario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFormSubmissions"
+        "401":
+          description: Sessao ausente ou expirada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Formulario nao encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   securitySchemes:
     cookieAuth:
@@ -547,6 +586,61 @@ components:
         created_at:
           type: string
           format: date-time
+    AdminFormSubmissions:
+      type: object
+      additionalProperties: false
+      required:
+        - form_id
+        - title
+        - slug
+        - submissions
+      properties:
+        form_id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        slug:
+          type: string
+        submissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSubmission"
+    AdminSubmission:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - created_at
+        - answers
+      properties:
+        id:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+        answers:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSubmissionAnswer"
+    AdminSubmissionAnswer:
+      type: object
+      additionalProperties: false
+      required:
+        - field_id
+        - field_type
+        - label
+        - value
+      properties:
+        field_id:
+          type: integer
+          format: int64
+        field_type:
+          $ref: "#/components/schemas/FormFieldType"
+        label:
+          type: string
+        value: {}
     CreateFormRequest:
       type: object
       additionalProperties: false

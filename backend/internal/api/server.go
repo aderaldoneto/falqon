@@ -47,6 +47,7 @@ type formRepository interface {
 	Publish(context.Context, int64, int64) (formdomain.Summary, error)
 	FindPublishedBySlug(context.Context, string) (formdomain.PublicForm, error)
 	CreateSubmission(context.Context, int64, []formdomain.Answer) (formdomain.Submission, error)
+	ListSubmissions(context.Context, int64, int64) (formdomain.FormSubmissions, error)
 }
 
 var formSlugPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
@@ -126,6 +127,47 @@ func (server *Server) CreateSubmission(
 		return nil, err
 	}
 	return CreateSubmission201JSONResponse{Id: submission.ID, CreatedAt: submission.CreatedAt}, nil
+}
+
+func (server *Server) ListFormSubmissions(
+	ctx context.Context,
+	request ListFormSubmissionsRequestObject,
+) (ListFormSubmissionsResponseObject, error) {
+	if request.Params.FalqonSession == nil {
+		return ListFormSubmissions401JSONResponse{Code: "unauthenticated", Message: "authentication is required"}, nil
+	}
+	user, err := server.authRepository.UserBySession(ctx, *request.Params.FalqonSession)
+	if errors.Is(err, formauth.ErrUnauthenticated) {
+		return ListFormSubmissions401JSONResponse{Code: "unauthenticated", Message: "authentication is required"}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	result, err := server.formRepository.ListSubmissions(ctx, request.FormId, user.ID)
+	if errors.Is(err, formdomain.ErrFormNotFound) {
+		return ListFormSubmissions404JSONResponse{Code: "form_not_found", Message: "form was not found"}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	submissions := make([]AdminSubmission, 0, len(result.Submissions))
+	for _, item := range result.Submissions {
+		answers := make([]AdminSubmissionAnswer, 0, len(item.Answers))
+		for _, answer := range item.Answers {
+			var value interface{}
+			if err := json.Unmarshal(answer.Value, &value); err != nil {
+				return nil, err
+			}
+			answers = append(answers, AdminSubmissionAnswer{
+				FieldId: answer.FieldID, FieldType: FormFieldType(answer.FieldType), Label: answer.Label, Value: value,
+			})
+		}
+		submissions = append(submissions, AdminSubmission{Id: item.ID, CreatedAt: item.CreatedAt, Answers: answers})
+	}
+	return ListFormSubmissions200JSONResponse{
+		FormId: result.FormID, Title: result.Title, Slug: result.Slug, Submissions: submissions,
+	}, nil
 }
 
 func (server *Server) RegisterUser(

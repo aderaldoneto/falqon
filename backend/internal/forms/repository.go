@@ -49,6 +49,26 @@ type Submission struct {
 	CreatedAt time.Time
 }
 
+type SubmissionAnswerResult struct {
+	FieldID   int64
+	FieldType FieldType
+	Label     string
+	Value     []byte
+}
+
+type SubmissionResult struct {
+	ID        int64
+	CreatedAt time.Time
+	Answers   []SubmissionAnswerResult
+}
+
+type FormSubmissions struct {
+	FormID      int64
+	Title       string
+	Slug        string
+	Submissions []SubmissionResult
+}
+
 type Repository struct {
 	database *pgxpool.Pool
 }
@@ -237,6 +257,57 @@ func (repository *Repository) CreateSubmission(ctx context.Context, formID int64
 		return Submission{}, fmt.Errorf("commit submission transaction: %w", err)
 	}
 	return submission, nil
+}
+
+func (repository *Repository) ListSubmissions(ctx context.Context, formID, ownerID int64) (FormSubmissions, error) {
+	result := FormSubmissions{FormID: formID, Submissions: make([]SubmissionResult, 0)}
+	err := repository.database.QueryRow(ctx, `
+		SELECT title, slug FROM forms
+		WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL
+	`, formID, ownerID).Scan(&result.Title, &result.Slug)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return FormSubmissions{}, ErrFormNotFound
+	}
+	if err != nil {
+		return FormSubmissions{}, fmt.Errorf("find form submissions owner: %w", err)
+	}
+
+	rows, err := repository.database.Query(ctx, `
+		SELECT s.id, s.created_at, ff.id, ff.field_type, ff.label, sa.value
+		FROM submissions s
+		LEFT JOIN submission_answers sa ON sa.submission_id = s.id AND sa.deleted_at IS NULL
+		LEFT JOIN form_fields ff ON ff.id = sa.field_id
+		WHERE s.form_id = $1 AND s.deleted_at IS NULL
+		ORDER BY s.created_at DESC, s.id DESC, ff.position
+	`, formID)
+	if err != nil {
+		return FormSubmissions{}, fmt.Errorf("list submissions: %w", err)
+	}
+	defer rows.Close()
+	byID := make(map[int64]int)
+	for rows.Next() {
+		var submissionID int64
+		var fieldID *int64
+		var createdAt time.Time
+		var fieldType, label *string
+		var value []byte
+		if err := rows.Scan(&submissionID, &createdAt, &fieldID, &fieldType, &label, &value); err != nil {
+			return FormSubmissions{}, fmt.Errorf("scan submission answer: %w", err)
+		}
+		index, exists := byID[submissionID]
+		if !exists {
+			index = len(result.Submissions)
+			byID[submissionID] = index
+			result.Submissions = append(result.Submissions, SubmissionResult{ID: submissionID, CreatedAt: createdAt, Answers: make([]SubmissionAnswerResult, 0)})
+		}
+		if fieldID != nil {
+			result.Submissions[index].Answers = append(result.Submissions[index].Answers, SubmissionAnswerResult{FieldID: *fieldID, FieldType: FieldType(*fieldType), Label: *label, Value: value})
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return FormSubmissions{}, fmt.Errorf("iterate submissions: %w", err)
+	}
+	return result, nil
 }
 
 func nullableString(value string) *string {

@@ -25,6 +25,9 @@ import type {
   ListFormsData,
   ListFormsErrors,
   ListFormsResponses,
+  ListFormSubmissionsData,
+  ListFormSubmissionsErrors,
+  ListFormSubmissionsResponses,
   LogoutData,
   LogoutResponses,
   PublishFormData,
@@ -246,5 +249,27 @@ export const publishForm = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/admin/forms/{formId}/publish",
+    ...options,
+  });
+
+/**
+ * Lista as respostas de um formulario do usuario autenticado
+ */
+export const listFormSubmissions = <ThrowOnError extends boolean = false>(
+  options: Options<ListFormSubmissionsData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<
+    ListFormSubmissionsResponses,
+    ListFormSubmissionsErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: "cookie",
+        name: "falqon_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/admin/forms/{formId}/submissions",
     ...options,
   });
