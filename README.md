@@ -91,6 +91,22 @@ docker compose logs -f
 docker compose down
 ```
 
+### Executando backend e frontend separadamente
+
+Para iniciar apenas o banco e o backend:
+
+```bash
+docker compose up --build db api
+```
+
+Com a API saudável, execute o frontend em outro terminal:
+
+```bash
+docker compose up --build --no-deps web
+```
+
+O backend é um serviço independente configurado por variáveis de ambiente. O frontend consome a URL definida em `VITE_API_URL`.
+
 ## Google OAuth
 
 Crie uma credencial OAuth 2.0 do tipo aplicação web no Google Cloud:
@@ -121,7 +137,9 @@ O catálogo público está em http://localhost:5173/forms.
 
 ## OpenAPI e geração de código
 
-O contrato está em `backend/openapi/openapi.yaml`. Após alterá-lo:
+O projeto segue a abordagem **contract-first**. A especificação OpenAPI não é inferida dos handlers: o arquivo versionado `backend/openapi/openapi.yaml` é a fonte do contrato e deve ser alterado antes da implementação.
+
+Não existe uma etapa separada para gerar o YAML. O processo integrado valida a especificação nos testes e gera, a partir dela, as interfaces do servidor Go e o client TypeScript. Após alterar o contrato:
 
 ```bash
 ./scripts/generate-api.sh
@@ -153,6 +171,11 @@ docker compose exec web npm run build
 ```
 
 O pipeline `.github/workflows/quality.yml` executa testes, análise estática, formatação e build.
+
+## Limitações conhecidas
+
+- O build do Vite informa que o bundle principal ultrapassa 500 kB. Isso não impede a execução; uma evolução seria dividir as páginas com carregamento sob demanda.
+- O Google OAuth depende de credenciais externas e precisa ser configurado no ambiente em que for avaliado.
 
 ## Migrations
 
