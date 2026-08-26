@@ -4,6 +4,7 @@
 # Frontend
 frontend/node_modules/
 frontend/dist/
+frontend/*.tsbuildinfo
 
 # Backend
 backend/bin/
@@ -12,4 +13,3 @@ backend/tmp/
 # Editors
 .idea/
 .vscode/
-

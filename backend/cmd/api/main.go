@@ -12,6 +12,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	api "github.com/aderaldo/falqon/backend/internal/api"
 )
 
 func main() {
@@ -34,11 +36,9 @@ func main() {
 	router.Use(middleware.RealIP)
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
-	router.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
-	})
+	apiServer := api.NewServer(pool)
+	strictHandler := api.NewStrictHandler(apiServer, nil)
+	api.HandlerFromMux(strictHandler, router)
 
 	address := os.Getenv("ADDRESS")
 	if address == "" {

@@ -61,3 +61,17 @@ Credenciais locais:
 E-mail: user@falqon.com.br
 Senha: 123456
 ```
+
+## OpenAPI e cliente TypeScript
+
+O contrato da API fica em `backend/openapi/openapi.yaml`. Depois de alterar o
+contrato, regenere o codigo Go e o cliente TypeScript:
+
+```bash
+docker compose exec api go generate ./internal/api
+docker compose exec web npm run generate:api
+```
+
+Os arquivos gerados ficam em `backend/internal/api/openapi.gen.go` e
+`frontend/src/api/generated`. Eles devem ser versionados e nao devem ser
+editados manualmente.
