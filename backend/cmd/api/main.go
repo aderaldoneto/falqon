@@ -16,6 +16,7 @@ import (
 
 	api "github.com/aderaldo/falqon/backend/internal/api"
 	formauth "github.com/aderaldo/falqon/backend/internal/auth"
+	formdomain "github.com/aderaldo/falqon/backend/internal/forms"
 )
 
 func main() {
@@ -53,10 +54,12 @@ func main() {
 		environmentOrDefault("GOOGLE_REDIRECT_URL", "http://localhost:8080/auth/google/callback"),
 	)
 	authRepository := formauth.NewRepository(pool)
+	formRepository := formdomain.NewRepository(pool)
 	apiServer := api.NewServer(
 		pool,
 		googleAuthenticator,
 		authRepository,
+		formRepository,
 		flowCodec,
 		api.ServerConfig{
 			WebURL:          webURL,

@@ -3,14 +3,17 @@ package api
 import (
 	"context"
 	"crypto/hmac"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/mail"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
 	formauth "github.com/aderaldo/falqon/backend/internal/auth"
+	formdomain "github.com/aderaldo/falqon/backend/internal/forms"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -37,6 +40,14 @@ type authRepository interface {
 	UserBySession(context.Context, string) (formauth.User, error)
 	RevokeSession(context.Context, string) error
 }
+
+type formRepository interface {
+	Create(context.Context, int64, string, string, *string, []formdomain.FieldDefinition) (formdomain.Summary, error)
+	ListByOwner(context.Context, int64) ([]formdomain.Summary, error)
+	Publish(context.Context, int64, int64) (formdomain.Summary, error)
+}
+
+var formSlugPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 
 func (server *Server) RegisterUser(
 	ctx context.Context,
@@ -101,6 +112,7 @@ type Server struct {
 	database       databaseHealthChecker
 	google         googleAuthenticator
 	authRepository authRepository
+	formRepository formRepository
 	flowCodec      *formauth.FlowCodec
 	config         ServerConfig
 }
@@ -109,6 +121,7 @@ func NewServer(
 	database databaseHealthChecker,
 	google googleAuthenticator,
 	authRepository authRepository,
+	formRepository formRepository,
 	flowCodec *formauth.FlowCodec,
 	config ServerConfig,
 ) *Server {
@@ -116,9 +129,129 @@ func NewServer(
 		database:       database,
 		google:         google,
 		authRepository: authRepository,
+		formRepository: formRepository,
 		flowCodec:      flowCodec,
 		config:         config,
 	}
+}
+
+func (server *Server) ListForms(
+	ctx context.Context,
+	request ListFormsRequestObject,
+) (ListFormsResponseObject, error) {
+	if request.Params.FalqonSession == nil {
+		return unauthenticatedFormsResponse(), nil
+	}
+	user, err := server.authRepository.UserBySession(ctx, *request.Params.FalqonSession)
+	if errors.Is(err, formauth.ErrUnauthenticated) {
+		return unauthenticatedFormsResponse(), nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	forms, err := server.formRepository.ListByOwner(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	response := make(ListForms200JSONResponse, 0, len(forms))
+	for _, form := range forms {
+		response = append(response, formSummaryResponse(form))
+	}
+	return response, nil
+}
+
+func (server *Server) CreateForm(
+	ctx context.Context,
+	request CreateFormRequestObject,
+) (CreateFormResponseObject, error) {
+	if request.Params.FalqonSession == nil {
+		return unauthenticatedCreateFormResponse(), nil
+	}
+	user, err := server.authRepository.UserBySession(ctx, *request.Params.FalqonSession)
+	if errors.Is(err, formauth.ErrUnauthenticated) {
+		return unauthenticatedCreateFormResponse(), nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if request.Body == nil {
+		return invalidForm("form data is required"), nil
+	}
+
+	title := strings.TrimSpace(request.Body.Title)
+	slug := strings.TrimSpace(request.Body.Slug)
+	if len(title) < 2 || len(title) > 255 || len(slug) < 2 || len(slug) > 255 ||
+		!formSlugPattern.MatchString(slug) || len(request.Body.Fields) == 0 {
+		return invalidForm("title, slug, and at least one field are required"), nil
+	}
+	if request.Body.Description != nil {
+		trimmed := strings.TrimSpace(*request.Body.Description)
+		if len(trimmed) > 2000 {
+			return invalidForm("description must contain at most 2000 characters"), nil
+		}
+		request.Body.Description = nullableAPIString(trimmed)
+	}
+
+	fields := make([]formdomain.FieldDefinition, 0, len(request.Body.Fields))
+	for position, input := range request.Body.Fields {
+		configuration, err := json.Marshal(input.Configuration)
+		if err != nil {
+			return invalidForm("field configuration is invalid"), nil
+		}
+		field := formdomain.FieldDefinition{
+			Type: formdomain.FieldType(input.Type), Label: strings.TrimSpace(input.Label),
+			Required: input.Required, Position: position, Configuration: configuration,
+		}
+		if input.Description != nil {
+			field.Description = strings.TrimSpace(*input.Description)
+		}
+		if err := field.Validate(); err != nil {
+			return invalidForm(err.Error()), nil
+		}
+		fields = append(fields, field)
+	}
+
+	form, err := server.formRepository.Create(
+		ctx, user.ID, title, slug, request.Body.Description, fields,
+	)
+	if errors.Is(err, formdomain.ErrSlugAlreadyExists) {
+		return CreateForm409JSONResponse{
+			Code: "slug_already_exists", Message: "slug is already in use",
+		}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return CreateForm201JSONResponse(formSummaryResponse(form)), nil
+}
+
+func (server *Server) PublishForm(
+	ctx context.Context,
+	request PublishFormRequestObject,
+) (PublishFormResponseObject, error) {
+	if request.Params.FalqonSession == nil {
+		return PublishForm401JSONResponse{Code: "unauthenticated", Message: "authentication is required"}, nil
+	}
+	user, err := server.authRepository.UserBySession(ctx, *request.Params.FalqonSession)
+	if errors.Is(err, formauth.ErrUnauthenticated) {
+		return PublishForm401JSONResponse{Code: "unauthenticated", Message: "authentication is required"}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	form, err := server.formRepository.Publish(ctx, request.FormId, user.ID)
+	if errors.Is(err, formdomain.ErrFormNotFound) {
+		return PublishForm404JSONResponse{Code: "form_not_found", Message: "form was not found"}, nil
+	}
+	if errors.Is(err, formdomain.ErrInvalidFormState) {
+		return PublishForm409JSONResponse{Code: "invalid_form_state", Message: "only draft forms can be published"}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return PublishForm200JSONResponse(formSummaryResponse(form)), nil
 }
 
 func (server *Server) GetHealth(
@@ -298,6 +431,35 @@ func unauthenticatedResponse() GetAuthSession401JSONResponse {
 	return GetAuthSession401JSONResponse{
 		Code:    "unauthenticated",
 		Message: "authentication is required",
+	}
+}
+
+func unauthenticatedFormsResponse() ListForms401JSONResponse {
+	return ListForms401JSONResponse{
+		Code:    "unauthenticated",
+		Message: "authentication is required",
+	}
+}
+
+func unauthenticatedCreateFormResponse() CreateForm401JSONResponse {
+	return CreateForm401JSONResponse{Code: "unauthenticated", Message: "authentication is required"}
+}
+
+func invalidForm(message string) CreateForm422JSONResponse {
+	return CreateForm422JSONResponse{Code: "invalid_form", Message: message}
+}
+
+func nullableAPIString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func formSummaryResponse(form formdomain.Summary) FormSummary {
+	return FormSummary{
+		Id: form.ID, Title: form.Title, Slug: form.Slug, Description: form.Description,
+		State: FormState(form.State), CreatedAt: form.CreatedAt, UpdatedAt: form.UpdatedAt,
 	}
 }
 

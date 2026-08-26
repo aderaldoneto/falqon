@@ -255,7 +255,13 @@ export function HomePage() {
                       {session.data.email}
                     </Typography>
                   </Box>
-                  <Button fullWidth variant="contained" size="large">
+                  <Button
+                    component={RouterLink}
+                    fullWidth
+                    size="large"
+                    to="/admin/forms"
+                    variant="contained"
+                  >
                     Acessar meus formulários
                   </Button>
                   <Button

@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
@@ -94,6 +95,23 @@ type Choice struct {
 	Value string `json:"value"`
 }
 
+// CreateFormField defines model for CreateFormField.
+type CreateFormField struct {
+	Configuration map[string]interface{} `json:"configuration"`
+	Description   *string                `json:"description,omitempty"`
+	Label         string                 `json:"label"`
+	Required      bool                   `json:"required"`
+	Type          FormFieldType          `json:"type"`
+}
+
+// CreateFormRequest defines model for CreateFormRequest.
+type CreateFormRequest struct {
+	Description *string           `json:"description,omitempty"`
+	Fields      []CreateFormField `json:"fields"`
+	Slug        string            `json:"slug"`
+	Title       string            `json:"title"`
+}
+
 // ErrorResponse defines model for ErrorResponse.
 type ErrorResponse struct {
 	Code    string `json:"code"`
@@ -105,6 +123,17 @@ type FormFieldType string
 
 // FormState defines model for FormState.
 type FormState string
+
+// FormSummary defines model for FormSummary.
+type FormSummary struct {
+	CreatedAt   time.Time `json:"created_at"`
+	Description *string   `json:"description,omitempty"`
+	Id          int64     `json:"id"`
+	Slug        string    `json:"slug"`
+	State       FormState `json:"state"`
+	Title       string    `json:"title"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
 
 // HealthResponse defines model for HealthResponse.
 type HealthResponse struct {
@@ -159,6 +188,21 @@ type User struct {
 	Name  string              `json:"name"`
 }
 
+// ListFormsParams defines parameters for ListForms.
+type ListFormsParams struct {
+	FalqonSession *string `form:"falqon_session,omitempty" json:"falqon_session,omitempty"`
+}
+
+// CreateFormParams defines parameters for CreateForm.
+type CreateFormParams struct {
+	FalqonSession *string `form:"falqon_session,omitempty" json:"falqon_session,omitempty"`
+}
+
+// PublishFormParams defines parameters for PublishForm.
+type PublishFormParams struct {
+	FalqonSession *string `form:"falqon_session,omitempty" json:"falqon_session,omitempty"`
+}
+
 // CompleteGoogleLoginParams defines parameters for CompleteGoogleLogin.
 type CompleteGoogleLoginParams struct {
 	Code        *string `form:"code,omitempty" json:"code,omitempty"`
@@ -177,11 +221,23 @@ type GetAuthSessionParams struct {
 	FalqonSession *string `form:"falqon_session,omitempty" json:"falqon_session,omitempty"`
 }
 
+// CreateFormJSONRequestBody defines body for CreateForm for application/json ContentType.
+type CreateFormJSONRequestBody = CreateFormRequest
+
 // RegisterUserJSONRequestBody defines body for RegisterUser for application/json ContentType.
 type RegisterUserJSONRequestBody = RegisterUserRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListForms Lista os formularios do usuario autenticado
+	// (GET /admin/forms)
+	ListForms(w http.ResponseWriter, r *http.Request, params ListFormsParams)
+	// CreateForm Cria um formulario dinamico como rascunho
+	// (POST /admin/forms)
+	CreateForm(w http.ResponseWriter, r *http.Request, params CreateFormParams)
+	// PublishForm Publica um formulario em rascunho
+	// (POST /admin/forms/{formId}/publish)
+	PublishForm(w http.ResponseWriter, r *http.Request, formId int64, params PublishFormParams)
 	// BeginGoogleLogin Inicia o login com Google
 	// (GET /auth/google)
 	BeginGoogleLogin(w http.ResponseWriter, r *http.Request)
@@ -205,6 +261,24 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// ListForms Lista os formularios do usuario autenticado
+// (GET /admin/forms)
+func (_ Unimplemented) ListForms(w http.ResponseWriter, r *http.Request, params ListFormsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateForm Cria um formulario dinamico como rascunho
+// (POST /admin/forms)
+func (_ Unimplemented) CreateForm(w http.ResponseWriter, r *http.Request, params CreateFormParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PublishForm Publica um formulario em rascunho
+// (POST /admin/forms/{formId}/publish)
+func (_ Unimplemented) PublishForm(w http.ResponseWriter, r *http.Request, formId int64, params PublishFormParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // BeginGoogleLogin Inicia o login com Google
 // (GET /auth/google)
@@ -250,6 +324,120 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListForms operation middleware
+func (siw *ServerInterfaceWrapper) ListForms(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListFormsParams
+
+	{
+		var cookie *http.Cookie
+
+		if cookie, err = r.Cookie("falqon_session"); err == nil {
+			var value string
+			err = runtime.BindStyledParameterWithOptions("simple", "falqon_session", cookie.Value, &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationCookie, Explode: true, Required: false, Type: "string", Format: ""})
+			if err != nil {
+				siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "falqon_session", Err: err})
+				return
+			}
+			params.FalqonSession = &value
+
+		}
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListForms(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateForm operation middleware
+func (siw *ServerInterfaceWrapper) CreateForm(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateFormParams
+
+	{
+		var cookie *http.Cookie
+
+		if cookie, err = r.Cookie("falqon_session"); err == nil {
+			var value string
+			err = runtime.BindStyledParameterWithOptions("simple", "falqon_session", cookie.Value, &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationCookie, Explode: true, Required: false, Type: "string", Format: ""})
+			if err != nil {
+				siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "falqon_session", Err: err})
+				return
+			}
+			params.FalqonSession = &value
+
+		}
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateForm(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PublishForm operation middleware
+func (siw *ServerInterfaceWrapper) PublishForm(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "formId" -------------
+	var formId int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "formId", chi.URLParam(r, "formId"), &formId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "formId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PublishFormParams
+
+	{
+		var cookie *http.Cookie
+
+		if cookie, err = r.Cookie("falqon_session"); err == nil {
+			var value string
+			err = runtime.BindStyledParameterWithOptions("simple", "falqon_session", cookie.Value, &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationCookie, Explode: true, Required: false, Type: "string", Format: ""})
+			if err != nil {
+				siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "falqon_session", Err: err})
+				return
+			}
+			params.FalqonSession = &value
+
+		}
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PublishForm(w, r, formId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // BeginGoogleLogin operation middleware
 func (siw *ServerInterfaceWrapper) BeginGoogleLogin(w http.ResponseWriter, r *http.Request) {
@@ -568,8 +756,183 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/auth/logout", wrapper.Logout)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/admin/forms", wrapper.ListForms)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/admin/forms", wrapper.CreateForm)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/admin/forms/{formId}/publish", wrapper.PublishForm)
+	})
 
 	return r
+}
+
+type ListFormsRequestObject struct {
+	Params ListFormsParams
+}
+
+type ListFormsResponseObject interface {
+	VisitListFormsResponse(w http.ResponseWriter) error
+}
+
+type ListForms200JSONResponse []FormSummary
+
+func (response ListForms200JSONResponse) VisitListFormsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListForms401JSONResponse ErrorResponse
+
+func (response ListForms401JSONResponse) VisitListFormsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateFormRequestObject struct {
+	Params CreateFormParams
+	Body   *CreateFormJSONRequestBody
+}
+
+type CreateFormResponseObject interface {
+	VisitCreateFormResponse(w http.ResponseWriter) error
+}
+
+type CreateForm201JSONResponse FormSummary
+
+func (response CreateForm201JSONResponse) VisitCreateFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateForm401JSONResponse ErrorResponse
+
+func (response CreateForm401JSONResponse) VisitCreateFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateForm409JSONResponse ErrorResponse
+
+func (response CreateForm409JSONResponse) VisitCreateFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateForm422JSONResponse ErrorResponse
+
+func (response CreateForm422JSONResponse) VisitCreateFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PublishFormRequestObject struct {
+	FormId int64 `json:"formId"`
+	Params PublishFormParams
+}
+
+type PublishFormResponseObject interface {
+	VisitPublishFormResponse(w http.ResponseWriter) error
+}
+
+type PublishForm200JSONResponse FormSummary
+
+func (response PublishForm200JSONResponse) VisitPublishFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PublishForm401JSONResponse ErrorResponse
+
+func (response PublishForm401JSONResponse) VisitPublishFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PublishForm404JSONResponse ErrorResponse
+
+func (response PublishForm404JSONResponse) VisitPublishFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PublishForm409JSONResponse ErrorResponse
+
+func (response PublishForm409JSONResponse) VisitPublishFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type BeginGoogleLoginRequestObject struct {
@@ -800,6 +1163,15 @@ func (response GetHealth503JSONResponse) VisitGetHealthResponse(w http.ResponseW
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListForms Lista os formularios do usuario autenticado
+	// (GET /admin/forms)
+	ListForms(ctx context.Context, request ListFormsRequestObject) (ListFormsResponseObject, error)
+	// CreateForm Cria um formulario dinamico como rascunho
+	// (POST /admin/forms)
+	CreateForm(ctx context.Context, request CreateFormRequestObject) (CreateFormResponseObject, error)
+	// PublishForm Publica um formulario em rascunho
+	// (POST /admin/forms/{formId}/publish)
+	PublishForm(ctx context.Context, request PublishFormRequestObject) (PublishFormResponseObject, error)
 	// BeginGoogleLogin Inicia o login com Google
 	// (GET /auth/google)
 	BeginGoogleLogin(ctx context.Context, request BeginGoogleLoginRequestObject) (BeginGoogleLoginResponseObject, error)
@@ -857,6 +1229,92 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListForms operation middleware
+func (sh *strictHandler) ListForms(w http.ResponseWriter, r *http.Request, params ListFormsParams) {
+	var request ListFormsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListForms(ctx, request.(ListFormsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListForms")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListFormsResponseObject); ok {
+		if err := validResponse.VisitListFormsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateForm operation middleware
+func (sh *strictHandler) CreateForm(w http.ResponseWriter, r *http.Request, params CreateFormParams) {
+	var request CreateFormRequestObject
+
+	request.Params = params
+
+	var body CreateFormJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateForm(ctx, request.(CreateFormRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateForm")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateFormResponseObject); ok {
+		if err := validResponse.VisitCreateFormResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PublishForm operation middleware
+func (sh *strictHandler) PublishForm(w http.ResponseWriter, r *http.Request, formId int64, params PublishFormParams) {
+	var request PublishFormRequestObject
+
+	request.FormId = formId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PublishForm(ctx, request.(PublishFormRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PublishForm")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PublishFormResponseObject); ok {
+		if err := validResponse.VisitPublishFormResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // BeginGoogleLogin operation middleware
@@ -1021,31 +1479,38 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"/w==",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

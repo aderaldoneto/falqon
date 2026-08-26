@@ -7,14 +7,23 @@ import type {
   BeginGoogleLoginErrors,
   CompleteGoogleLoginData,
   CompleteGoogleLoginErrors,
+  CreateFormData,
+  CreateFormErrors,
+  CreateFormResponses,
   GetAuthSessionData,
   GetAuthSessionErrors,
   GetAuthSessionResponses,
   GetHealthData,
   GetHealthErrors,
   GetHealthResponses,
+  ListFormsData,
+  ListFormsErrors,
+  ListFormsResponses,
   LogoutData,
   LogoutResponses,
+  PublishFormData,
+  PublishFormErrors,
+  PublishFormResponses,
   RegisterUserData,
   RegisterUserErrors,
   RegisterUserResponses,
@@ -130,5 +139,75 @@ export const logout = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/auth/logout",
+    ...options,
+  });
+
+/**
+ * Lista os formularios do usuario autenticado
+ */
+export const listForms = <ThrowOnError extends boolean = false>(
+  options?: Options<ListFormsData, ThrowOnError>,
+) =>
+  (options?.client ?? client).get<
+    ListFormsResponses,
+    ListFormsErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: "cookie",
+        name: "falqon_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/admin/forms",
+    ...options,
+  });
+
+/**
+ * Cria um formulario dinamico como rascunho
+ */
+export const createForm = <ThrowOnError extends boolean = false>(
+  options: Options<CreateFormData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    CreateFormResponses,
+    CreateFormErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: "cookie",
+        name: "falqon_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/admin/forms",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Publica um formulario em rascunho
+ */
+export const publishForm = <ThrowOnError extends boolean = false>(
+  options: Options<PublishFormData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    PublishFormResponses,
+    PublishFormErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: "cookie",
+        name: "falqon_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/admin/forms/{formId}/publish",
     ...options,
   });

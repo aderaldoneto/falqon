@@ -8,6 +8,7 @@ import (
 	"time"
 
 	formauth "github.com/aderaldo/falqon/backend/internal/auth"
+	formdomain "github.com/aderaldo/falqon/backend/internal/forms"
 )
 
 type databaseHealthCheckerStub struct{ err error }
@@ -38,6 +39,36 @@ type authRepositoryStub struct {
 	sessionToken string
 	expiresAt    time.Time
 	createError  error
+}
+
+type formRepositoryStub struct {
+	forms []formdomain.Summary
+	err   error
+}
+
+func (stub formRepositoryStub) Create(
+	context.Context,
+	int64,
+	string,
+	string,
+	*string,
+	[]formdomain.FieldDefinition,
+) (formdomain.Summary, error) {
+	if len(stub.forms) == 0 {
+		return formdomain.Summary{}, stub.err
+	}
+	return stub.forms[0], stub.err
+}
+
+func (stub formRepositoryStub) ListByOwner(context.Context, int64) ([]formdomain.Summary, error) {
+	return stub.forms, stub.err
+}
+
+func (stub formRepositoryStub) Publish(context.Context, int64, int64) (formdomain.Summary, error) {
+	if len(stub.forms) == 0 {
+		return formdomain.Summary{}, stub.err
+	}
+	return stub.forms[0], stub.err
 }
 
 func (stub authRepositoryStub) CreateEmailUser(
@@ -223,11 +254,168 @@ func TestRegisterUserRejectsInvalidData(t *testing.T) {
 	}
 }
 
+func TestListFormsReturnsAuthenticatedUsersForms(t *testing.T) {
+	t.Parallel()
+
+	description := "Uma pesquisa sobre o filme"
+	updatedAt := time.Now().UTC()
+	repository := authRepositoryStub{
+		user: formauth.User{ID: 7, Name: "Maria", Email: "maria@example.com"},
+	}
+	formsRepository := formRepositoryStub{forms: []formdomain.Summary{
+		{
+			ID:          11,
+			Title:       "The Godfather",
+			Slug:        "the-godfather",
+			Description: &description,
+			State:       "DRAFT",
+			CreatedAt:   updatedAt,
+			UpdatedAt:   updatedAt,
+		},
+	}}
+	server := newAuthTestServerWithForms(googleAuthenticatorStub{}, repository, formsRepository)
+	token := "session-token"
+
+	response, err := server.ListForms(context.Background(), ListFormsRequestObject{
+		Params: ListFormsParams{FalqonSession: &token},
+	})
+	if err != nil {
+		t.Fatalf("ListForms() error = %v", err)
+	}
+	list, ok := response.(ListForms200JSONResponse)
+	if !ok || len(list) != 1 || list[0].Slug != "the-godfather" {
+		t.Fatalf("ListForms() response = %#v, want the authenticated user's form", response)
+	}
+}
+
+func TestListFormsRequiresSession(t *testing.T) {
+	t.Parallel()
+
+	server := newAuthTestServer(googleAuthenticatorStub{}, authRepositoryStub{})
+	response, err := server.ListForms(context.Background(), ListFormsRequestObject{})
+	if err != nil {
+		t.Fatalf("ListForms() error = %v", err)
+	}
+	if _, ok := response.(ListForms401JSONResponse); !ok {
+		t.Fatalf("ListForms() response = %T, want ListForms401JSONResponse", response)
+	}
+}
+
+func TestCreateFormValidatesAndCreatesDraft(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	formsRepository := formRepositoryStub{forms: []formdomain.Summary{
+		{ID: 15, Title: "Parasite", Slug: "parasite", State: "DRAFT", CreatedAt: now, UpdatedAt: now},
+	}}
+	server := newAuthTestServerWithForms(
+		googleAuthenticatorStub{},
+		authRepositoryStub{user: formauth.User{ID: 7}},
+		formsRepository,
+	)
+	token := "session-token"
+
+	response, err := server.CreateForm(context.Background(), CreateFormRequestObject{
+		Params: CreateFormParams{FalqonSession: &token},
+		Body: &CreateFormJSONRequestBody{
+			Title: " Parasite ",
+			Slug:  "parasite",
+			Fields: []CreateFormField{
+				{
+					Type: RATING, Label: "Qual é sua nota?", Required: true,
+					Configuration: map[string]interface{}{"min": float64(1), "max": float64(5)},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateForm() error = %v", err)
+	}
+	created, ok := response.(CreateForm201JSONResponse)
+	if !ok || created.Id != 15 || created.State != DRAFT {
+		t.Fatalf("CreateForm() response = %#v, want created draft", response)
+	}
+}
+
+func TestCreateFormRejectsInvalidSlug(t *testing.T) {
+	t.Parallel()
+
+	server := newAuthTestServerWithForms(
+		googleAuthenticatorStub{}, authRepositoryStub{user: formauth.User{ID: 7}}, formRepositoryStub{},
+	)
+	token := "session-token"
+	response, err := server.CreateForm(context.Background(), CreateFormRequestObject{
+		Params: CreateFormParams{FalqonSession: &token},
+		Body: &CreateFormJSONRequestBody{
+			Title: "Movie", Slug: "Invalid Slug", Fields: []CreateFormField{{
+				Type: SHORTTEXT, Label: "Review", Configuration: map[string]interface{}{},
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateForm() error = %v", err)
+	}
+	if _, ok := response.(CreateForm422JSONResponse); !ok {
+		t.Fatalf("CreateForm() response = %T, want CreateForm422JSONResponse", response)
+	}
+}
+
+func TestPublishFormPublishesDraft(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	server := newAuthTestServerWithForms(
+		googleAuthenticatorStub{},
+		authRepositoryStub{user: formauth.User{ID: 7}},
+		formRepositoryStub{forms: []formdomain.Summary{{
+			ID: 15, Title: "Parasite", Slug: "parasite", State: "PUBLISHED", CreatedAt: now, UpdatedAt: now,
+		}}},
+	)
+	token := "session-token"
+	response, err := server.PublishForm(context.Background(), PublishFormRequestObject{
+		FormId: 15, Params: PublishFormParams{FalqonSession: &token},
+	})
+	if err != nil {
+		t.Fatalf("PublishForm() error = %v", err)
+	}
+	published, ok := response.(PublishForm200JSONResponse)
+	if !ok || published.State != PUBLISHED {
+		t.Fatalf("PublishForm() response = %#v, want published form", response)
+	}
+}
+
+func TestPublishFormRejectsInvalidState(t *testing.T) {
+	t.Parallel()
+
+	server := newAuthTestServerWithForms(
+		googleAuthenticatorStub{}, authRepositoryStub{user: formauth.User{ID: 7}},
+		formRepositoryStub{err: formdomain.ErrInvalidFormState},
+	)
+	token := "session-token"
+	response, err := server.PublishForm(context.Background(), PublishFormRequestObject{
+		FormId: 15, Params: PublishFormParams{FalqonSession: &token},
+	})
+	if err != nil {
+		t.Fatalf("PublishForm() error = %v", err)
+	}
+	if _, ok := response.(PublishForm409JSONResponse); !ok {
+		t.Fatalf("PublishForm() response = %T, want PublishForm409JSONResponse", response)
+	}
+}
+
 func newHealthTestServer(database databaseHealthChecker) *Server {
-	return NewServer(database, nil, nil, nil, ServerConfig{})
+	return NewServer(database, nil, nil, nil, nil, ServerConfig{})
 }
 
 func newAuthTestServer(google googleAuthenticator, repository authRepository) *Server {
+	return newAuthTestServerWithForms(google, repository, formRepositoryStub{})
+}
+
+func newAuthTestServerWithForms(
+	google googleAuthenticator,
+	repository authRepository,
+	formsRepository formRepository,
+) *Server {
 	codec, err := formauth.NewFlowCodec("a-secret-with-at-least-32-characters")
 	if err != nil {
 		panic(err)
@@ -236,6 +424,7 @@ func newAuthTestServer(google googleAuthenticator, repository authRepository) *S
 		databaseHealthCheckerStub{},
 		google,
 		repository,
+		formsRepository,
 		codec,
 		ServerConfig{
 			WebURL:          "http://localhost:5173",

@@ -5,6 +5,8 @@ import { CssBaseline, ThemeProvider, createTheme } from '@mui/material'
 import { RouterProvider, createBrowserRouter } from 'react-router-dom'
 import { HomePage } from './pages/HomePage'
 import { RegisterPage } from './pages/RegisterPage'
+import { FormsAdminPage } from './pages/FormsAdminPage'
+import { FormEditorPage } from './pages/FormEditorPage'
 
 const queryClient = new QueryClient()
 const theme = createTheme({
@@ -34,6 +36,8 @@ const theme = createTheme({
 const router = createBrowserRouter([
   { path: '/', element: <HomePage /> },
   { path: '/register', element: <RegisterPage /> },
+  { path: '/admin/forms', element: <FormsAdminPage /> },
+  { path: '/admin/forms/new', element: <FormEditorPage /> },
 ])
 
 createRoot(document.getElementById('root')!).render(

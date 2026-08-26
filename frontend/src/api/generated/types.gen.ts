@@ -27,6 +27,33 @@ export type RegisterUserRequest = {
 
 export type FormState = "DRAFT" | "PUBLISHED" | "CANCELED";
 
+export type FormSummary = {
+  id: number;
+  title: string;
+  slug: string;
+  description?: string;
+  state: FormState;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreateFormRequest = {
+  title: string;
+  slug: string;
+  description?: string;
+  fields: Array<CreateFormField>;
+};
+
+export type CreateFormField = {
+  type: FormFieldType;
+  label: string;
+  description?: string;
+  required: boolean;
+  configuration: {
+    [key: string]: unknown;
+  };
+};
+
 export type FormFieldType =
   | "SHORT_TEXT"
   | "LONG_TEXT"
@@ -201,3 +228,97 @@ export type LogoutResponses = {
 };
 
 export type LogoutResponse = LogoutResponses[keyof LogoutResponses];
+
+export type ListFormsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/admin/forms";
+};
+
+export type ListFormsErrors = {
+  /**
+   * Sessao ausente ou expirada
+   */
+  401: ErrorResponse;
+};
+
+export type ListFormsError = ListFormsErrors[keyof ListFormsErrors];
+
+export type ListFormsResponses = {
+  /**
+   * Formularios do usuario
+   */
+  200: Array<FormSummary>;
+};
+
+export type ListFormsResponse = ListFormsResponses[keyof ListFormsResponses];
+
+export type CreateFormData = {
+  body: CreateFormRequest;
+  path?: never;
+  query?: never;
+  url: "/admin/forms";
+};
+
+export type CreateFormErrors = {
+  /**
+   * Sessao ausente ou expirada
+   */
+  401: ErrorResponse;
+  /**
+   * Slug ja utilizado
+   */
+  409: ErrorResponse;
+  /**
+   * Definicao do formulario invalida
+   */
+  422: ErrorResponse;
+};
+
+export type CreateFormError = CreateFormErrors[keyof CreateFormErrors];
+
+export type CreateFormResponses = {
+  /**
+   * Formulario criado
+   */
+  201: FormSummary;
+};
+
+export type CreateFormResponse = CreateFormResponses[keyof CreateFormResponses];
+
+export type PublishFormData = {
+  body?: never;
+  path: {
+    formId: number;
+  };
+  query?: never;
+  url: "/admin/forms/{formId}/publish";
+};
+
+export type PublishFormErrors = {
+  /**
+   * Sessao ausente ou expirada
+   */
+  401: ErrorResponse;
+  /**
+   * Formulario nao encontrado
+   */
+  404: ErrorResponse;
+  /**
+   * Estado atual nao permite publicacao
+   */
+  409: ErrorResponse;
+};
+
+export type PublishFormError = PublishFormErrors[keyof PublishFormErrors];
+
+export type PublishFormResponses = {
+  /**
+   * Formulario publicado
+   */
+  200: FormSummary;
+};
+
+export type PublishFormResponse =
+  PublishFormResponses[keyof PublishFormResponses];
