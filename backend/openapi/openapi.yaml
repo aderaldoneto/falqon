@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Falqon Form Builder API
+  title: Falqon - Seu sistema de reviews e análises
   version: 0.1.0
   description: API para criar, publicar e responder formularios dinamicos.
 servers:
@@ -14,6 +14,21 @@ tags:
   - name: Forms
     description: Gerenciamento administrativo de formularios
 paths:
+  /forms:
+    get:
+      operationId: listPublishedForms
+      summary: Lista os formularios publicados disponiveis para respostas
+      tags:
+        - Forms
+      responses:
+        "200":
+          description: Formularios publicados
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FormSummary"
   /forms/{slug}:
     get:
       operationId: getPublicForm

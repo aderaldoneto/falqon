@@ -13,6 +13,10 @@ import (
 
 type databaseHealthCheckerStub struct{ err error }
 
+
+func (stub formRepositoryStub) ListPublished(context.Context) ([]formdomain.Summary, error) {
+	return stub.forms, nil
+}
 func (stub databaseHealthCheckerStub) Ping(context.Context) error { return stub.err }
 
 type googleAuthenticatorStub struct {

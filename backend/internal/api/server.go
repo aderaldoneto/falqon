@@ -44,10 +44,31 @@ type authRepository interface {
 type formRepository interface {
 	Create(context.Context, int64, string, string, *string, []formdomain.FieldDefinition) (formdomain.Summary, error)
 	ListByOwner(context.Context, int64) ([]formdomain.Summary, error)
+	ListPublished(context.Context) ([]formdomain.Summary, error)
 	Publish(context.Context, int64, int64) (formdomain.Summary, error)
 	FindPublishedBySlug(context.Context, string) (formdomain.PublicForm, error)
 	CreateSubmission(context.Context, int64, []formdomain.Answer) (formdomain.Submission, error)
 	ListSubmissions(context.Context, int64, int64) (formdomain.FormSubmissions, error)
+}
+
+func (server *Server) ListPublishedForms(
+	ctx context.Context,
+	_ ListPublishedFormsRequestObject,
+) (ListPublishedFormsResponseObject, error) {
+	forms, err := server.formRepository.ListPublished(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	response := make(ListPublishedForms200JSONResponse, 0, len(forms))
+	for _, form := range forms {
+		response = append(response, FormSummary{
+			Id: form.ID, Title: form.Title, Slug: form.Slug,
+			Description: form.Description, State: FormState(form.State),
+			CreatedAt: form.CreatedAt, UpdatedAt: form.UpdatedAt,
+		})
+	}
+	return response, nil
 }
 
 var formSlugPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)

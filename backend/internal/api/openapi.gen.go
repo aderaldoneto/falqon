@@ -323,6 +323,9 @@ type ServerInterface interface {
 	// GetAuthSession Retorna o usuario autenticado
 	// (GET /auth/session)
 	GetAuthSession(w http.ResponseWriter, r *http.Request, params GetAuthSessionParams)
+	// ListPublishedForms Lista os formularios publicados disponiveis para respostas
+	// (GET /forms)
+	ListPublishedForms(w http.ResponseWriter, r *http.Request)
 	// GetPublicForm Busca um formulario publicado pelo slug
 	// (GET /forms/{slug})
 	GetPublicForm(w http.ResponseWriter, r *http.Request, slug string)
@@ -389,6 +392,12 @@ func (_ Unimplemented) RegisterUser(w http.ResponseWriter, r *http.Request) {
 // GetAuthSession Retorna o usuario autenticado
 // (GET /auth/session)
 func (_ Unimplemented) GetAuthSession(w http.ResponseWriter, r *http.Request, params GetAuthSessionParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListPublishedForms Lista os formularios publicados disponiveis para respostas
+// (GET /forms)
+func (_ Unimplemented) ListPublishedForms(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -749,6 +758,20 @@ func (siw *ServerInterfaceWrapper) GetAuthSession(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ListPublishedForms operation middleware
+func (siw *ServerInterfaceWrapper) ListPublishedForms(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPublishedForms(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetPublicForm operation middleware
 func (siw *ServerInterfaceWrapper) GetPublicForm(w http.ResponseWriter, r *http.Request) {
 
@@ -928,6 +951,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/forms", wrapper.ListPublishedForms)
+	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/forms/{slug}", wrapper.GetPublicForm)
 	})
@@ -1376,6 +1402,27 @@ func (response GetAuthSession401JSONResponse) VisitGetAuthSessionResponse(w http
 	return err
 }
 
+type ListPublishedFormsRequestObject struct {
+}
+
+type ListPublishedFormsResponseObject interface {
+	VisitListPublishedFormsResponse(w http.ResponseWriter) error
+}
+
+type ListPublishedForms200JSONResponse []FormSummary
+
+func (response ListPublishedForms200JSONResponse) VisitListPublishedFormsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetPublicFormRequestObject struct {
 	Slug string `json:"slug"`
 }
@@ -1527,6 +1574,9 @@ type StrictServerInterface interface {
 	// GetAuthSession Retorna o usuario autenticado
 	// (GET /auth/session)
 	GetAuthSession(ctx context.Context, request GetAuthSessionRequestObject) (GetAuthSessionResponseObject, error)
+	// ListPublishedForms Lista os formularios publicados disponiveis para respostas
+	// (GET /forms)
+	ListPublishedForms(ctx context.Context, request ListPublishedFormsRequestObject) (ListPublishedFormsResponseObject, error)
 	// GetPublicForm Busca um formulario publicado pelo slug
 	// (GET /forms/{slug})
 	GetPublicForm(ctx context.Context, request GetPublicFormRequestObject) (GetPublicFormResponseObject, error)
@@ -1823,6 +1873,30 @@ func (sh *strictHandler) GetAuthSession(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
+// ListPublishedForms operation middleware
+func (sh *strictHandler) ListPublishedForms(w http.ResponseWriter, r *http.Request) {
+	var request ListPublishedFormsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPublishedForms(ctx, request.(ListPublishedFormsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPublishedForms")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPublishedFormsResponseObject); ok {
+		if err := validResponse.VisitListPublishedFormsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetPublicForm operation middleware
 func (sh *strictHandler) GetPublicForm(w http.ResponseWriter, r *http.Request, slug string) {
 	var request GetPublicFormRequestObject
@@ -1911,44 +1985,45 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

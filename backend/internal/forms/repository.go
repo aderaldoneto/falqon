@@ -160,6 +160,40 @@ func (repository *Repository) ListByOwner(ctx context.Context, ownerID int64) ([
 	return forms, nil
 }
 
+func (repository *Repository) ListPublished(ctx context.Context) ([]Summary, error) {
+	rows, err := repository.database.Query(ctx, `
+		SELECT id, title, slug, description, state::text, created_at, updated_at
+		FROM forms
+		WHERE state = 'PUBLISHED' AND deleted_at IS NULL
+		ORDER BY updated_at DESC, id DESC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list published forms: %w", err)
+	}
+	defer rows.Close()
+
+	forms := make([]Summary, 0)
+	for rows.Next() {
+		var form Summary
+		if err := rows.Scan(
+			&form.ID,
+			&form.Title,
+			&form.Slug,
+			&form.Description,
+			&form.State,
+			&form.CreatedAt,
+			&form.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan published form summary: %w", err)
+		}
+		forms = append(forms, form)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate published form summaries: %w", err)
+	}
+	return forms, nil
+}
+
 func (repository *Repository) Publish(ctx context.Context, formID, ownerID int64) (Summary, error) {
 	var form Summary
 	err := repository.database.QueryRow(ctx, `

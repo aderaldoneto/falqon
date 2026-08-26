@@ -146,6 +146,23 @@ export type RatingConfiguration = {
   max: number;
 };
 
+export type ListPublishedFormsData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/forms";
+};
+
+export type ListPublishedFormsResponses = {
+  /**
+   * Formularios publicados
+   */
+  200: Array<FormSummary>;
+};
+
+export type ListPublishedFormsResponse =
+  ListPublishedFormsResponses[keyof ListPublishedFormsResponses];
+
 export type GetPublicFormData = {
   body?: never;
   path: {

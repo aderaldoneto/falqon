@@ -28,6 +28,8 @@ import type {
   ListFormSubmissionsData,
   ListFormSubmissionsErrors,
   ListFormSubmissionsResponses,
+  ListPublishedFormsData,
+  ListPublishedFormsResponses,
   LogoutData,
   LogoutResponses,
   PublishFormData,
@@ -55,6 +57,18 @@ export type Options<
    */
   meta?: Record<string, unknown>;
 };
+
+/**
+ * Lista os formularios publicados disponiveis para respostas
+ */
+export const listPublishedForms = <ThrowOnError extends boolean = false>(
+  options?: Options<ListPublishedFormsData, ThrowOnError>,
+) =>
+  (options?.client ?? client).get<
+    ListPublishedFormsResponses,
+    unknown,
+    ThrowOnError
+  >({ url: "/forms", ...options });
 
 /**
  * Busca um formulario publicado pelo slug

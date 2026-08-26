@@ -113,9 +113,11 @@ export function HomePage() {
               FALQON
             </Typography>
           </Stack>
-          <Typography color="text.secondary" fontSize={13}>
-            Reviews feitas para conversar
-          </Typography>
+          <Stack direction="row" alignItems="center" spacing={{ xs: 1, sm: 2 }}>
+            <Button component={RouterLink} size="small" to="/forms" variant="outlined">
+              Ver formulários para responder
+            </Button>
+          </Stack>
         </Stack>
 
         <Box
