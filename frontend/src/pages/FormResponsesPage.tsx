@@ -2,12 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Alert, Box, Button, CircularProgress, Container, Divider, Paper, Stack, Typography, alpha } from '@mui/material'
 import { Link as RouterLink, Navigate, useParams } from 'react-router-dom'
 import { getAuthSession, listFormSubmissions } from '../api/generated'
-
-const displayValue = (value: unknown) => {
-  if (Array.isArray(value)) return value.join(', ')
-  if (value === null || value === undefined || value === '') return 'Sem resposta'
-  return String(value)
-}
+import { displayValue } from './pageHelpers'
 
 export function FormResponsesPage() {
   const { formId = '' } = useParams()

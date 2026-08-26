@@ -21,6 +21,9 @@ func TestValidateAnswer(t *testing.T) {
 		{name: "invalid number step", field: PublicField{ID: 2, Type: FieldTypeNumber, Configuration: []byte(`{"step":0.5}`)}, value: float64(2.2)},
 		{name: "choice", field: PublicField{ID: 3, Type: FieldTypeSingleChoice, Configuration: []byte(`{"choices":[{"value":"yes","label":"Yes"}]}`)}, value: "yes", valid: true},
 		{name: "unknown choice", field: PublicField{ID: 3, Type: FieldTypeSingleChoice, Configuration: []byte(`{"choices":[{"value":"yes","label":"Yes"}]}`)}, value: "no"},
+		{name: "multiple choices", field: PublicField{ID: 5, Type: FieldTypeMultipleChoice, Configuration: []byte(`{"choices":[{"value":"a","label":"A"},{"value":"b","label":"B"}],"min_selections":1,"max_selections":2}`)}, value: []interface{}{"a", "b"}, valid: true},
+		{name: "duplicate multiple choices", field: PublicField{ID: 5, Type: FieldTypeMultipleChoice, Configuration: []byte(`{"choices":[{"value":"a","label":"A"},{"value":"b","label":"B"}]}`)}, value: []interface{}{"a", "a"}},
+		{name: "unknown multiple choice", field: PublicField{ID: 5, Type: FieldTypeMultipleChoice, Configuration: []byte(`{"choices":[{"value":"a","label":"A"},{"value":"b","label":"B"}]}`)}, value: []interface{}{"c"}},
 		{name: "rating", field: PublicField{ID: 4, Type: FieldTypeRating, Configuration: []byte(`{"min":1,"max":5}`)}, value: float64(5), valid: true},
 		{name: "fractional rating", field: PublicField{ID: 4, Type: FieldTypeRating, Configuration: []byte(`{"min":1,"max":5}`)}, value: 4.5},
 	}

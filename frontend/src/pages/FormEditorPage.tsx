@@ -24,6 +24,7 @@ import {
   type CreateFormField,
   type FormFieldType,
 } from '../api/generated'
+import { slugify } from './pageHelpers'
 
 type EditorField = CreateFormField & { key: number }
 
@@ -60,14 +61,6 @@ const newField = (key: number, type: FormFieldType = 'SHORT_TEXT'): EditorField 
   required: false,
   configuration: defaultConfiguration(type),
 })
-
-const slugify = (value: string) =>
-  value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
 
 export function FormEditorPage() {
   const navigate = useNavigate()

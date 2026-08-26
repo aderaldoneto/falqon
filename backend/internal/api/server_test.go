@@ -42,6 +42,7 @@ type authRepositoryStub struct {
 	sessionToken string
 	expiresAt    time.Time
 	createError  error
+	userError    error
 }
 
 type formRepositoryStub struct {
@@ -141,7 +142,7 @@ func (stub authRepositoryStub) CreateSession(
 }
 
 func (stub authRepositoryStub) UserBySession(context.Context, string) (formauth.User, error) {
-	return stub.user, nil
+	return stub.user, stub.userError
 }
 
 func (stub authRepositoryStub) RevokeSession(context.Context, string) error { return nil }
@@ -296,6 +297,21 @@ func TestRegisterUserRejectsInvalidData(t *testing.T) {
 	}
 	if _, ok := response.(RegisterUser422JSONResponse); !ok {
 		t.Fatalf("RegisterUser() response = %T, want RegisterUser422JSONResponse", response)
+	}
+}
+
+func TestRegisterUserRejectsDuplicateEmail(t *testing.T) {
+	t.Parallel()
+
+	server := newAuthTestServer(googleAuthenticatorStub{}, authRepositoryStub{createError: formauth.ErrEmailAlreadyExists})
+	response, err := server.RegisterUser(context.Background(), RegisterUserRequestObject{Body: &RegisterUserJSONRequestBody{
+		Name: "Maria", Email: "maria@example.com", Password: "password123",
+	}})
+	if err != nil {
+		t.Fatalf("RegisterUser() error = %v", err)
+	}
+	if _, ok := response.(RegisterUser409JSONResponse); !ok {
+		t.Fatalf("RegisterUser() response = %T, want RegisterUser409JSONResponse", response)
 	}
 }
 
@@ -514,6 +530,103 @@ func TestPublishFormRejectsInvalidState(t *testing.T) {
 	}
 	if _, ok := response.(PublishForm409JSONResponse); !ok {
 		t.Fatalf("PublishForm() response = %T, want PublishForm409JSONResponse", response)
+	}
+}
+
+func TestCreateSubmissionAcceptsValidRequiredAnswer(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	server := newAuthTestServerWithForms(googleAuthenticatorStub{}, authRepositoryStub{}, formRepositoryStub{
+		forms: []formdomain.Summary{{ID: 11, Slug: "movie"}}, submission: formdomain.Submission{ID: 31, CreatedAt: now},
+	})
+	response, err := server.CreateSubmission(context.Background(), CreateSubmissionRequestObject{
+		Slug: "movie", Body: &CreateSubmissionJSONRequestBody{Answers: []SubmissionAnswer{{FieldId: 21, Value: float64(5)}}},
+	})
+	if err != nil {
+		t.Fatalf("CreateSubmission() error = %v", err)
+	}
+	created, ok := response.(CreateSubmission201JSONResponse)
+	if !ok || created.Id != 31 {
+		t.Fatalf("CreateSubmission() response = %#v, want created submission", response)
+	}
+}
+
+func TestCreateSubmissionRejectsMissingRequiredAnswer(t *testing.T) {
+	t.Parallel()
+
+	server := newAuthTestServerWithForms(googleAuthenticatorStub{}, authRepositoryStub{}, formRepositoryStub{forms: []formdomain.Summary{{ID: 11}}})
+	response, err := server.CreateSubmission(context.Background(), CreateSubmissionRequestObject{
+		Slug: "movie", Body: &CreateSubmissionJSONRequestBody{Answers: []SubmissionAnswer{}},
+	})
+	if err != nil {
+		t.Fatalf("CreateSubmission() error = %v", err)
+	}
+	if _, ok := response.(CreateSubmission422JSONResponse); !ok {
+		t.Fatalf("CreateSubmission() response = %T, want CreateSubmission422JSONResponse", response)
+	}
+}
+
+func TestListFormSubmissionsReturnsAnswers(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	token := "session-token"
+	server := newAuthTestServerWithForms(googleAuthenticatorStub{}, authRepositoryStub{user: formauth.User{ID: 7}}, formRepositoryStub{
+		formSubmissions: formdomain.FormSubmissions{FormID: 11, Title: "Movie", Slug: "movie", Submissions: []formdomain.SubmissionResult{{
+			ID: 31, CreatedAt: now, Answers: []formdomain.SubmissionAnswerResult{{FieldID: 21, FieldType: formdomain.FieldTypeRating, Label: "Nota", Value: []byte(`5`)}},
+		}}},
+	})
+	response, err := server.ListFormSubmissions(context.Background(), ListFormSubmissionsRequestObject{
+		FormId: 11, Params: ListFormSubmissionsParams{FalqonSession: &token},
+	})
+	if err != nil {
+		t.Fatalf("ListFormSubmissions() error = %v", err)
+	}
+	result, ok := response.(ListFormSubmissions200JSONResponse)
+	if !ok || len(result.Submissions) != 1 || len(result.Submissions[0].Answers) != 1 {
+		t.Fatalf("ListFormSubmissions() response = %#v, want one answer", response)
+	}
+}
+
+func TestListFormSubmissionsRequiresSession(t *testing.T) {
+	t.Parallel()
+
+	server := newAuthTestServer(googleAuthenticatorStub{}, authRepositoryStub{})
+	response, err := server.ListFormSubmissions(context.Background(), ListFormSubmissionsRequestObject{FormId: 11})
+	if err != nil {
+		t.Fatalf("ListFormSubmissions() error = %v", err)
+	}
+	if _, ok := response.(ListFormSubmissions401JSONResponse); !ok {
+		t.Fatalf("ListFormSubmissions() response = %T, want ListFormSubmissions401JSONResponse", response)
+	}
+}
+
+func TestGetAuthSessionRejectsExpiredSession(t *testing.T) {
+	t.Parallel()
+
+	token := "expired"
+	server := newAuthTestServer(googleAuthenticatorStub{}, authRepositoryStub{userError: formauth.ErrUnauthenticated})
+	response, err := server.GetAuthSession(context.Background(), GetAuthSessionRequestObject{Params: GetAuthSessionParams{FalqonSession: &token}})
+	if err != nil {
+		t.Fatalf("GetAuthSession() error = %v", err)
+	}
+	if _, ok := response.(GetAuthSession401JSONResponse); !ok {
+		t.Fatalf("GetAuthSession() response = %T, want GetAuthSession401JSONResponse", response)
+	}
+}
+
+func TestDeleteFormReturnsNotFound(t *testing.T) {
+	t.Parallel()
+
+	token := "session-token"
+	server := newAuthTestServerWithForms(googleAuthenticatorStub{}, authRepositoryStub{user: formauth.User{ID: 7}}, formRepositoryStub{err: formdomain.ErrFormNotFound})
+	response, err := server.DeleteForm(context.Background(), DeleteFormRequestObject{FormId: 99, Params: DeleteFormParams{FalqonSession: &token}})
+	if err != nil {
+		t.Fatalf("DeleteForm() error = %v", err)
+	}
+	if _, ok := response.(DeleteForm404JSONResponse); !ok {
+		t.Fatalf("DeleteForm() response = %T, want DeleteForm404JSONResponse", response)
 	}
 }
 
