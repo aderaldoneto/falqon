@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -17,6 +18,8 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
+	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for FormFieldType.
@@ -131,6 +134,13 @@ type RatingConfiguration struct {
 	Min int `json:"min"`
 }
 
+// RegisterUserRequest defines model for RegisterUserRequest.
+type RegisterUserRequest struct {
+	Email    openapi_types.Email `json:"email"`
+	Name     string              `json:"name"`
+	Password string              `json:"password"`
+}
+
 // SingleChoiceConfiguration defines model for SingleChoiceConfiguration.
 type SingleChoiceConfiguration struct {
 	Choices []Choice `json:"choices"`
@@ -142,8 +152,51 @@ type TextConfiguration struct {
 	MinLength *int `json:"min_length,omitempty"`
 }
 
+// User defines model for User.
+type User struct {
+	Email openapi_types.Email `json:"email"`
+	Id    int64               `json:"id"`
+	Name  string              `json:"name"`
+}
+
+// CompleteGoogleLoginParams defines parameters for CompleteGoogleLogin.
+type CompleteGoogleLoginParams struct {
+	Code        *string `form:"code,omitempty" json:"code,omitempty"`
+	State       *string `form:"state,omitempty" json:"state,omitempty"`
+	Error       *string `form:"error,omitempty" json:"error,omitempty"`
+	FalqonOauth *string `form:"falqon_oauth,omitempty" json:"falqon_oauth,omitempty"`
+}
+
+// LogoutParams defines parameters for Logout.
+type LogoutParams struct {
+	FalqonSession *string `form:"falqon_session,omitempty" json:"falqon_session,omitempty"`
+}
+
+// GetAuthSessionParams defines parameters for GetAuthSession.
+type GetAuthSessionParams struct {
+	FalqonSession *string `form:"falqon_session,omitempty" json:"falqon_session,omitempty"`
+}
+
+// RegisterUserJSONRequestBody defines body for RegisterUser for application/json ContentType.
+type RegisterUserJSONRequestBody = RegisterUserRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// BeginGoogleLogin Inicia o login com Google
+	// (GET /auth/google)
+	BeginGoogleLogin(w http.ResponseWriter, r *http.Request)
+	// CompleteGoogleLogin Finaliza o login com Google
+	// (GET /auth/google/callback)
+	CompleteGoogleLogin(w http.ResponseWriter, r *http.Request, params CompleteGoogleLoginParams)
+	// Logout Encerra a sessao atual
+	// (POST /auth/logout)
+	Logout(w http.ResponseWriter, r *http.Request, params LogoutParams)
+	// RegisterUser Cadastra um usuario com e-mail e inicia sua sessao
+	// (POST /auth/register)
+	RegisterUser(w http.ResponseWriter, r *http.Request)
+	// GetAuthSession Retorna o usuario autenticado
+	// (GET /auth/session)
+	GetAuthSession(w http.ResponseWriter, r *http.Request, params GetAuthSessionParams)
 	// GetHealth Consulta a saude da API
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -152,6 +205,36 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// BeginGoogleLogin Inicia o login com Google
+// (GET /auth/google)
+func (_ Unimplemented) BeginGoogleLogin(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CompleteGoogleLogin Finaliza o login com Google
+// (GET /auth/google/callback)
+func (_ Unimplemented) CompleteGoogleLogin(w http.ResponseWriter, r *http.Request, params CompleteGoogleLoginParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Logout Encerra a sessao atual
+// (POST /auth/logout)
+func (_ Unimplemented) Logout(w http.ResponseWriter, r *http.Request, params LogoutParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// RegisterUser Cadastra um usuario com e-mail e inicia sua sessao
+// (POST /auth/register)
+func (_ Unimplemented) RegisterUser(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetAuthSession Retorna o usuario autenticado
+// (GET /auth/session)
+func (_ Unimplemented) GetAuthSession(w http.ResponseWriter, r *http.Request, params GetAuthSessionParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // GetHealth Consulta a saude da API
 // (GET /health)
@@ -167,6 +250,178 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// BeginGoogleLogin operation middleware
+func (siw *ServerInterfaceWrapper) BeginGoogleLogin(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BeginGoogleLogin(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CompleteGoogleLogin operation middleware
+func (siw *ServerInterfaceWrapper) CompleteGoogleLogin(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CompleteGoogleLoginParams
+
+	// ------------- Optional query parameter "code" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "code", r.URL.Query(), &params.Code, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "code"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error", r.URL.Query(), &params.Error, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error", Err: err})
+		}
+		return
+	}
+
+	{
+		var cookie *http.Cookie
+
+		if cookie, err = r.Cookie("falqon_oauth"); err == nil {
+			var value string
+			err = runtime.BindStyledParameterWithOptions("simple", "falqon_oauth", cookie.Value, &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationCookie, Explode: true, Required: false, Type: "string", Format: ""})
+			if err != nil {
+				siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "falqon_oauth", Err: err})
+				return
+			}
+			params.FalqonOauth = &value
+
+		}
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompleteGoogleLogin(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Logout operation middleware
+func (siw *ServerInterfaceWrapper) Logout(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params LogoutParams
+
+	{
+		var cookie *http.Cookie
+
+		if cookie, err = r.Cookie("falqon_session"); err == nil {
+			var value string
+			err = runtime.BindStyledParameterWithOptions("simple", "falqon_session", cookie.Value, &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationCookie, Explode: true, Required: false, Type: "string", Format: ""})
+			if err != nil {
+				siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "falqon_session", Err: err})
+				return
+			}
+			params.FalqonSession = &value
+
+		}
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Logout(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RegisterUser operation middleware
+func (siw *ServerInterfaceWrapper) RegisterUser(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RegisterUser(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAuthSession operation middleware
+func (siw *ServerInterfaceWrapper) GetAuthSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAuthSessionParams
+
+	{
+		var cookie *http.Cookie
+
+		if cookie, err = r.Cookie("falqon_session"); err == nil {
+			var value string
+			err = runtime.BindStyledParameterWithOptions("simple", "falqon_session", cookie.Value, &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationCookie, Explode: true, Required: false, Type: "string", Format: ""})
+			if err != nil {
+				siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "falqon_session", Err: err})
+				return
+			}
+			params.FalqonSession = &value
+
+		}
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAuthSession(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
@@ -298,8 +553,214 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.GetHealth)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/auth/google", wrapper.BeginGoogleLogin)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/register", wrapper.RegisterUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/auth/google/callback", wrapper.CompleteGoogleLogin)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/auth/session", wrapper.GetAuthSession)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/logout", wrapper.Logout)
+	})
 
 	return r
+}
+
+type BeginGoogleLoginRequestObject struct {
+}
+
+type BeginGoogleLoginResponseObject interface {
+	VisitBeginGoogleLoginResponse(w http.ResponseWriter) error
+}
+
+type BeginGoogleLogin307ResponseHeaders struct {
+	Location  string
+	SetCookie string
+}
+
+type BeginGoogleLogin307Response struct {
+	Headers BeginGoogleLogin307ResponseHeaders
+}
+
+func (response BeginGoogleLogin307Response) VisitBeginGoogleLoginResponse(w http.ResponseWriter) error {
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
+	w.Header().Set("Set-Cookie", fmt.Sprint(response.Headers.SetCookie))
+	w.WriteHeader(307)
+	return nil
+}
+
+type BeginGoogleLogin503JSONResponse ErrorResponse
+
+func (response BeginGoogleLogin503JSONResponse) VisitBeginGoogleLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteGoogleLoginRequestObject struct {
+	Params CompleteGoogleLoginParams
+}
+
+type CompleteGoogleLoginResponseObject interface {
+	VisitCompleteGoogleLoginResponse(w http.ResponseWriter) error
+}
+
+type CompleteGoogleLogin302ResponseHeaders struct {
+	Location  string
+	SetCookie string
+}
+
+type CompleteGoogleLogin302Response struct {
+	Headers CompleteGoogleLogin302ResponseHeaders
+}
+
+func (response CompleteGoogleLogin302Response) VisitCompleteGoogleLoginResponse(w http.ResponseWriter) error {
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
+	w.Header().Set("Set-Cookie", fmt.Sprint(response.Headers.SetCookie))
+	w.WriteHeader(302)
+	return nil
+}
+
+type CompleteGoogleLogin400JSONResponse ErrorResponse
+
+func (response CompleteGoogleLogin400JSONResponse) VisitCompleteGoogleLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LogoutRequestObject struct {
+	Params LogoutParams
+}
+
+type LogoutResponseObject interface {
+	VisitLogoutResponse(w http.ResponseWriter) error
+}
+
+type Logout204ResponseHeaders struct {
+	SetCookie string
+}
+
+type Logout204Response struct {
+	Headers Logout204ResponseHeaders
+}
+
+func (response Logout204Response) VisitLogoutResponse(w http.ResponseWriter) error {
+	w.Header().Set("Set-Cookie", fmt.Sprint(response.Headers.SetCookie))
+	w.WriteHeader(204)
+	return nil
+}
+
+type RegisterUserRequestObject struct {
+	Body *RegisterUserJSONRequestBody
+}
+
+type RegisterUserResponseObject interface {
+	VisitRegisterUserResponse(w http.ResponseWriter) error
+}
+
+type RegisterUser201ResponseHeaders struct {
+	SetCookie string
+}
+
+type RegisterUser201JSONResponse struct {
+	Body    User
+	Headers RegisterUser201ResponseHeaders
+}
+
+func (response RegisterUser201JSONResponse) VisitRegisterUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Set-Cookie", fmt.Sprint(response.Headers.SetCookie))
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterUser409JSONResponse ErrorResponse
+
+func (response RegisterUser409JSONResponse) VisitRegisterUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterUser422JSONResponse ErrorResponse
+
+func (response RegisterUser422JSONResponse) VisitRegisterUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthSessionRequestObject struct {
+	Params GetAuthSessionParams
+}
+
+type GetAuthSessionResponseObject interface {
+	VisitGetAuthSessionResponse(w http.ResponseWriter) error
+}
+
+type GetAuthSession200JSONResponse User
+
+func (response GetAuthSession200JSONResponse) VisitGetAuthSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthSession401JSONResponse ErrorResponse
+
+func (response GetAuthSession401JSONResponse) VisitGetAuthSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetHealthRequestObject struct {
@@ -339,6 +800,21 @@ func (response GetHealth503JSONResponse) VisitGetHealthResponse(w http.ResponseW
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// BeginGoogleLogin Inicia o login com Google
+	// (GET /auth/google)
+	BeginGoogleLogin(ctx context.Context, request BeginGoogleLoginRequestObject) (BeginGoogleLoginResponseObject, error)
+	// CompleteGoogleLogin Finaliza o login com Google
+	// (GET /auth/google/callback)
+	CompleteGoogleLogin(ctx context.Context, request CompleteGoogleLoginRequestObject) (CompleteGoogleLoginResponseObject, error)
+	// Logout Encerra a sessao atual
+	// (POST /auth/logout)
+	Logout(ctx context.Context, request LogoutRequestObject) (LogoutResponseObject, error)
+	// RegisterUser Cadastra um usuario com e-mail e inicia sua sessao
+	// (POST /auth/register)
+	RegisterUser(ctx context.Context, request RegisterUserRequestObject) (RegisterUserResponseObject, error)
+	// GetAuthSession Retorna o usuario autenticado
+	// (GET /auth/session)
+	GetAuthSession(ctx context.Context, request GetAuthSessionRequestObject) (GetAuthSessionResponseObject, error)
 	// GetHealth Consulta a saude da API
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
@@ -383,6 +859,139 @@ type strictHandler struct {
 	options     StrictHTTPServerOptions
 }
 
+// BeginGoogleLogin operation middleware
+func (sh *strictHandler) BeginGoogleLogin(w http.ResponseWriter, r *http.Request) {
+	var request BeginGoogleLoginRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.BeginGoogleLogin(ctx, request.(BeginGoogleLoginRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "BeginGoogleLogin")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(BeginGoogleLoginResponseObject); ok {
+		if err := validResponse.VisitBeginGoogleLoginResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CompleteGoogleLogin operation middleware
+func (sh *strictHandler) CompleteGoogleLogin(w http.ResponseWriter, r *http.Request, params CompleteGoogleLoginParams) {
+	var request CompleteGoogleLoginRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CompleteGoogleLogin(ctx, request.(CompleteGoogleLoginRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CompleteGoogleLogin")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CompleteGoogleLoginResponseObject); ok {
+		if err := validResponse.VisitCompleteGoogleLoginResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Logout operation middleware
+func (sh *strictHandler) Logout(w http.ResponseWriter, r *http.Request, params LogoutParams) {
+	var request LogoutRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Logout(ctx, request.(LogoutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Logout")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LogoutResponseObject); ok {
+		if err := validResponse.VisitLogoutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RegisterUser operation middleware
+func (sh *strictHandler) RegisterUser(w http.ResponseWriter, r *http.Request) {
+	var request RegisterUserRequestObject
+
+	var body RegisterUserJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RegisterUser(ctx, request.(RegisterUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RegisterUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RegisterUserResponseObject); ok {
+		if err := validResponse.VisitRegisterUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAuthSession operation middleware
+func (sh *strictHandler) GetAuthSession(w http.ResponseWriter, r *http.Request, params GetAuthSessionParams) {
+	var request GetAuthSessionRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAuthSession(ctx, request.(GetAuthSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAuthSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAuthSessionResponseObject); ok {
+		if err := validResponse.VisitGetAuthSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetHealth operation middleware
 func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	var request GetHealthRequestObject
@@ -412,20 +1021,31 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"zFVNT+NIEP0rrdo9WokHtNLItxAMWAohSoK00gihil1xerY/PP2BglD++6rbhmSCEcsOhzml1OlX9are",
-	"6/ITlFo2WpFyFrInsOWGJMZwvNG8pBBhVXHHtUIxM7oh4zhZyNYoLCXQHBw9gcAViRBIriakareB7EsC",
-	"7rEhyMA6w1UNuwQeUHh6994uAUM/PDdUQfatAyVdkbuX63r1nUoX0ubGaDMn22hlP0q91FWEvOIqyVqs",
-	"+/474hcz7O/3EbzQRl5wEtUy/vMEpLwM2MXVzXx5v8z/XkICk5vp5XM8vb0+y+eQwKKYXk7y+/HVTTHO",
-	"IYHr28mymB2ezEfLYnp5UHffQ6i7cOh+qnk+H12EErPbs0mxuMrPIYHxaDrOJ/l5b5YrQuE2/3O+1qHz",
-	"9rC+/qenytFMO1TfLK+9cLwR1Bp1rNWa195goPNR6WOGGHJHMgZ/GlpDBn8M9w9k2L2OYfc0gje4KlrE",
-	"yQtDNAYf45+4vbckqAw0bOd2LkPze69z5agm0yV76376+v6x+boe+iY19XJF5lcmJHF74H8V83WUe8+t",
-	"oyZKvS2Ft/yBrp87ccZT0tfYM3jX08AcHVf1JzQgcdsJkB6QOHlDjfckO5IgIKLqvSIsuKp/W7N+wExL",
-	"2rpfVOJedCv/v7yInrv9r+GIaTjiaq0DsiJbGt60bGE0K1iDBllpOJqENX4leImGETNxt1Vk2Fob6QUa",
-	"ri2ruELJS20HkIDjToQ6Fyh+aMXCZmVnnosAGs0KSOCBjG0rpYMvgzQ0ohtS2HDI4HSQDk4hgQbdJs5j",
-	"uIlbNYQ1ufATphUnW1SQwSW5du9C0KhdvRF4kqbtd0s5UhGITRMaCdDhd9sq09rgPZMcbfY4vNdDI7ZC",
-	"VWpWEauwioMJAP5A3IYu/0pPP43Rz5/yNwhx9cJAMO2ZJcmwJGs1Q92SjdawXko0j5DBWCvrhUOGzKKP",
-	"jXSqOaxt/BI/WkcS7mJJSyaoCdm3VyaSK07KERO6RAEJeCMgg41zTTYcxsONti77mn5NYXf3kv84T24d",
-	"VppFzcv4gvaUFMrgtI7R7m73bwAAAP//",
+	"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",
+	"/w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

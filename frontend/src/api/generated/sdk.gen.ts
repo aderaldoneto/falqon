@@ -3,9 +3,21 @@
 import type { Client, Options as Options2, TDataShape } from "./client";
 import { client } from "./client.gen";
 import type {
+  BeginGoogleLoginData,
+  BeginGoogleLoginErrors,
+  CompleteGoogleLoginData,
+  CompleteGoogleLoginErrors,
+  GetAuthSessionData,
+  GetAuthSessionErrors,
+  GetAuthSessionResponses,
   GetHealthData,
   GetHealthErrors,
   GetHealthResponses,
+  LogoutData,
+  LogoutResponses,
+  RegisterUserData,
+  RegisterUserErrors,
+  RegisterUserResponses,
 } from "./types.gen";
 
 export type Options<
@@ -37,3 +49,86 @@ export const getHealth = <ThrowOnError extends boolean = false>(
     GetHealthErrors,
     ThrowOnError
   >({ url: "/health", ...options });
+
+/**
+ * Inicia o login com Google
+ */
+export const beginGoogleLogin = <ThrowOnError extends boolean = false>(
+  options?: Options<BeginGoogleLoginData, ThrowOnError>,
+) =>
+  (options?.client ?? client).get<
+    unknown,
+    BeginGoogleLoginErrors,
+    ThrowOnError
+  >({ url: "/auth/google", ...options });
+
+/**
+ * Cadastra um usuario com e-mail e inicia sua sessao
+ */
+export const registerUser = <ThrowOnError extends boolean = false>(
+  options: Options<RegisterUserData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    RegisterUserResponses,
+    RegisterUserErrors,
+    ThrowOnError
+  >({
+    url: "/auth/register",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Finaliza o login com Google
+ */
+export const completeGoogleLogin = <ThrowOnError extends boolean = false>(
+  options?: Options<CompleteGoogleLoginData, ThrowOnError>,
+) =>
+  (options?.client ?? client).get<
+    unknown,
+    CompleteGoogleLoginErrors,
+    ThrowOnError
+  >({ url: "/auth/google/callback", ...options });
+
+/**
+ * Retorna o usuario autenticado
+ */
+export const getAuthSession = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAuthSessionData, ThrowOnError>,
+) =>
+  (options?.client ?? client).get<
+    GetAuthSessionResponses,
+    GetAuthSessionErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: "cookie",
+        name: "falqon_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/auth/session",
+    ...options,
+  });
+
+/**
+ * Encerra a sessao atual
+ */
+export const logout = <ThrowOnError extends boolean = false>(
+  options?: Options<LogoutData, ThrowOnError>,
+) =>
+  (options?.client ?? client).post<LogoutResponses, unknown, ThrowOnError>({
+    security: [
+      {
+        in: "cookie",
+        name: "falqon_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/auth/logout",
+    ...options,
+  });

@@ -9,6 +9,8 @@ servers:
 tags:
   - name: System
     description: Estado operacional da API
+  - name: Authentication
+    description: Autenticacao e sessao administrativa
 paths:
   /health:
     get:
@@ -29,7 +31,168 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /auth/google:
+    get:
+      operationId: beginGoogleLogin
+      summary: Inicia o login com Google
+      tags:
+        - Authentication
+      responses:
+        "307":
+          description: Redireciona para o Google
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+                format: uri
+            Set-Cookie:
+              required: true
+              schema:
+                type: string
+        "503":
+          description: Autenticacao Google nao configurada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/register:
+    post:
+      operationId: registerUser
+      summary: Cadastra um usuario com e-mail e inicia sua sessao
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterUserRequest"
+      responses:
+        "201":
+          description: Usuario cadastrado e autenticado
+          headers:
+            Set-Cookie:
+              required: true
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "409":
+          description: E-mail ja cadastrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Dados de cadastro invalidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/google/callback:
+    get:
+      operationId: completeGoogleLogin
+      summary: Finaliza o login com Google
+      tags:
+        - Authentication
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: error
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: falqon_oauth
+          in: cookie
+          required: false
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redireciona de volta para o frontend
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+                format: uri
+            Set-Cookie:
+              required: true
+              schema:
+                type: string
+        "400":
+          description: Callback invalido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/session:
+    get:
+      operationId: getAuthSession
+      summary: Retorna o usuario autenticado
+      tags:
+        - Authentication
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: falqon_session
+          in: cookie
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Sessao autenticada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Sessao ausente ou expirada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Encerra a sessao atual
+      tags:
+        - Authentication
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: falqon_session
+          in: cookie
+          required: false
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Sessao encerrada
+          headers:
+            Set-Cookie:
+              required: true
+              schema:
+                type: string
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: falqon_session
   schemas:
     HealthResponse:
       type: object
@@ -52,6 +215,42 @@ components:
           type: string
         message:
           type: string
+    User:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - email
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+    RegisterUserRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - email
+        - password
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 160
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          minLength: 8
+          maxLength: 72
     FormState:
       type: string
       enum:

@@ -23,6 +23,12 @@ services:
     environment:
       ADDRESS: 0.0.0.0:8080
       DATABASE_URL: postgres://${POSTGRES_USER:-falqon}:${POSTGRES_PASSWORD:-falqon}@db:5432/${POSTGRES_DB:-falqon}?sslmode=disable
+      WEB_URL: ${WEB_URL:-http://localhost:5173}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-http://localhost:8080/auth/google/callback}
+      SESSION_SECRET: ${SESSION_SECRET:-change-me-with-at-least-32-characters}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     ports:
       - "${API_PORT:-8080}:8080"
     volumes:

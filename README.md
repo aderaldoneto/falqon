@@ -75,3 +75,11 @@ docker compose exec web npm run generate:api
 Os arquivos gerados ficam em `backend/internal/api/openapi.gen.go` e
 `frontend/src/api/generated`. Eles devem ser versionados e nao devem ser
 editados manualmente.
+
+No Google Cloud, configure:
+- Authorized JavaScript origin:
+    http://localhost:5173
+- Authorized redirect URI:
+    http://localhost:8080/auth/google/callback
+Execute:
+    docker compose up -d

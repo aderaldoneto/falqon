@@ -13,6 +13,18 @@ export type ErrorResponse = {
   message: string;
 };
 
+export type User = {
+  id: number;
+  name: string;
+  email: string;
+};
+
+export type RegisterUserRequest = {
+  name: string;
+  email: string;
+  password: string;
+};
+
 export type FormState = "DRAFT" | "PUBLISHED" | "CANCELED";
 
 export type FormFieldType =
@@ -78,3 +90,114 @@ export type GetHealthResponses = {
 };
 
 export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
+
+export type BeginGoogleLoginData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/auth/google";
+};
+
+export type BeginGoogleLoginErrors = {
+  /**
+   * Autenticacao Google nao configurada
+   */
+  503: ErrorResponse;
+};
+
+export type BeginGoogleLoginError =
+  BeginGoogleLoginErrors[keyof BeginGoogleLoginErrors];
+
+export type RegisterUserData = {
+  body: RegisterUserRequest;
+  path?: never;
+  query?: never;
+  url: "/auth/register";
+};
+
+export type RegisterUserErrors = {
+  /**
+   * E-mail ja cadastrado
+   */
+  409: ErrorResponse;
+  /**
+   * Dados de cadastro invalidos
+   */
+  422: ErrorResponse;
+};
+
+export type RegisterUserError = RegisterUserErrors[keyof RegisterUserErrors];
+
+export type RegisterUserResponses = {
+  /**
+   * Usuario cadastrado e autenticado
+   */
+  201: User;
+};
+
+export type RegisterUserResponse =
+  RegisterUserResponses[keyof RegisterUserResponses];
+
+export type CompleteGoogleLoginData = {
+  body?: never;
+  path?: never;
+  query?: {
+    code?: string;
+    state?: string;
+    error?: string;
+  };
+  url: "/auth/google/callback";
+};
+
+export type CompleteGoogleLoginErrors = {
+  /**
+   * Callback invalido
+   */
+  400: ErrorResponse;
+};
+
+export type CompleteGoogleLoginError =
+  CompleteGoogleLoginErrors[keyof CompleteGoogleLoginErrors];
+
+export type GetAuthSessionData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/auth/session";
+};
+
+export type GetAuthSessionErrors = {
+  /**
+   * Sessao ausente ou expirada
+   */
+  401: ErrorResponse;
+};
+
+export type GetAuthSessionError =
+  GetAuthSessionErrors[keyof GetAuthSessionErrors];
+
+export type GetAuthSessionResponses = {
+  /**
+   * Sessao autenticada
+   */
+  200: User;
+};
+
+export type GetAuthSessionResponse =
+  GetAuthSessionResponses[keyof GetAuthSessionResponses];
+
+export type LogoutData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/auth/logout";
+};
+
+export type LogoutResponses = {
+  /**
+   * Sessao encerrada
+   */
+  204: void;
+};
+
+export type LogoutResponse = LogoutResponses[keyof LogoutResponses];
