@@ -55,12 +55,6 @@ desenvolvimento:
 docker compose exec db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /seeds/admin.sql'
 ```
 
-Em ambientes com Make, o atalho equivalente e:
-
-```bash
-make seed
-```
-
 Credenciais locais:
 
 ```text
