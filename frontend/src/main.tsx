@@ -43,6 +43,7 @@ const router = createBrowserRouter([
   { path: '/forms/:slug', element: <PublicFormPage /> },
   { path: '/admin/forms', element: <FormsAdminPage /> },
   { path: '/admin/forms/new', element: <FormEditorPage /> },
+  { path: '/admin/forms/:formId/edit', element: <FormEditorPage /> },
   { path: '/admin/forms/:formId/responses', element: <FormResponsesPage /> },
 ])
 

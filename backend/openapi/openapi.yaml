@@ -339,6 +339,101 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /admin/forms/{formId}:
+    get:
+      operationId: getForm
+      summary: Busca um formulario do usuario autenticado para edicao
+      tags:
+        - Forms
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: falqon_session
+          in: cookie
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Formulario para edicao
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicForm"
+        "401":
+          description: Sessao ausente ou expirada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Formulario nao encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateForm
+      summary: Atualiza um formulario em rascunho
+      tags:
+        - Forms
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: falqon_session
+          in: cookie
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFormRequest"
+      responses:
+        "200":
+          description: Formulario atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormSummary"
+        "401":
+          description: Sessao ausente ou expirada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Formulario nao encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Slug ja utilizado ou formulario publicado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Definicao do formulario invalida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /admin/forms/{formId}/publish:
     post:
       operationId: publishForm

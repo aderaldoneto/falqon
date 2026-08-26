@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
@@ -15,10 +15,12 @@ import {
   Typography,
   alpha,
 } from '@mui/material'
-import { Link as RouterLink, Navigate, useNavigate } from 'react-router-dom'
+import { Link as RouterLink, Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   createForm,
+  getForm,
   getAuthSession,
+  updateForm,
   type CreateFormField,
   type FormFieldType,
 } from '../api/generated'
@@ -69,6 +71,9 @@ const slugify = (value: string) =>
 
 export function FormEditorPage() {
   const navigate = useNavigate()
+  const { formId: formIdParam } = useParams()
+  const formId = formIdParam ? Number(formIdParam) : undefined
+  const isEditing = Number.isInteger(formId)
   const queryClient = useQueryClient()
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
@@ -83,25 +88,53 @@ export function FormEditorPage() {
     queryFn: async () => (await getAuthSession()).data ?? null,
     retry: false,
   })
+  const existingForm = useQuery({
+    queryKey: ['form', formId],
+    queryFn: async () => {
+      const response = await getForm({ path: { formId: formId! } })
+      if (response.error) throw new Error('Não foi possível carregar o formulário.')
+      return response.data
+    },
+    enabled: Boolean(session.data) && isEditing,
+    retry: false,
+  })
+  useEffect(() => {
+    if (!existingForm.data) return
+    setTitle(existingForm.data.title)
+    setSlug(existingForm.data.slug)
+    setSlugEdited(true)
+    setDescription(existingForm.data.description ?? '')
+    setFields(existingForm.data.fields.map((field) => ({
+      key: field.id,
+      type: field.type,
+      label: field.label,
+      description: field.description ?? '',
+      required: field.required,
+      configuration: field.configuration,
+    })))
+    setNextKey(existingForm.data.fields.length + 1)
+  }, [existingForm.data])
   const save = useMutation({
     mutationFn: async () => {
-      const response = await createForm({
-        body: {
-          title: title.trim(),
-          slug,
-          description: description.trim() || undefined,
-          fields: fields.map((field) => ({
-            type: field.type,
-            label: field.label,
-            description: field.description,
-            required: field.required,
-            configuration: field.configuration,
-          })),
-        },
-      })
+      const body = {
+        title: title.trim(),
+        slug,
+        description: description.trim() || undefined,
+        fields: fields.map((field) => ({
+          type: field.type,
+          label: field.label,
+          description: field.description,
+          required: field.required,
+          configuration: field.configuration,
+        })),
+      }
+      const response = isEditing
+        ? await updateForm({ path: { formId: formId! }, body })
+        : await createForm({ body })
       if (response.error) {
         const error = response.error as { code?: string; message?: string }
         if (error.code === 'slug_already_exists') throw new Error('Este slug já está em uso.')
+        if (error.code === 'invalid_form_state') throw new Error('Apenas rascunhos podem ser editados.')
         throw new Error(error.message ?? 'Não foi possível salvar o formulário.')
       }
       return response.data
@@ -151,6 +184,12 @@ export function FormEditorPage() {
     return <Box minHeight="100vh" display="grid" sx={{ placeItems: 'center' }}><CircularProgress /></Box>
   }
   if (!session.data) return <Navigate replace to="/" />
+  if (isEditing && existingForm.isLoading) {
+    return <Box minHeight="100vh" display="grid" sx={{ placeItems: 'center' }}><CircularProgress aria-label="Carregando formulário" /></Box>
+  }
+  if (isEditing && (existingForm.isError || !existingForm.data)) {
+    return <Alert severity="error">{existingForm.error?.message ?? 'Formulário não encontrado.'}</Alert>
+  }
 
   return (
     <Box minHeight="100vh" bgcolor="background.default">
@@ -158,7 +197,7 @@ export function FormEditorPage() {
         <Container maxWidth="lg">
           <Stack direction="row" justifyContent="space-between" alignItems="center" py={2}>
             <Button component={RouterLink} color="inherit" to="/admin/forms">← Meus formulários</Button>
-            <Typography color="text.secondary" fontSize={13}>Rascunho não salvo</Typography>
+            <Typography color="text.secondary" fontSize={13}>{isEditing ? 'Editando rascunho' : 'Rascunho não salvo'}</Typography>
           </Stack>
         </Container>
       </Box>
@@ -171,7 +210,7 @@ export function FormEditorPage() {
                 EDITOR DINÂMICO
               </Typography>
               <Typography component="h1" variant="h3" fontFamily="Georgia, serif" sx={{ mt: 0.75 }}>
-                Novo formulário
+                {isEditing ? 'Editar formulário' : 'Novo formulário'}
               </Typography>
             </Box>
 

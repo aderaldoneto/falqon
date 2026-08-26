@@ -226,6 +226,81 @@ func (repository *Repository) Publish(ctx context.Context, formID, ownerID int64
 	return Summary{}, ErrInvalidFormState
 }
 
+func (repository *Repository) FindByOwner(ctx context.Context, formID, ownerID int64) (PublicForm, error) {
+	var form PublicForm
+	err := repository.database.QueryRow(ctx, `
+		SELECT id, title, slug, description
+		FROM forms
+		WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL
+	`, formID, ownerID).Scan(&form.ID, &form.Title, &form.Slug, &form.Description)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return PublicForm{}, ErrFormNotFound
+	}
+	if err != nil {
+		return PublicForm{}, fmt.Errorf("find form by owner: %w", err)
+	}
+	return repository.loadFields(ctx, form)
+}
+
+func (repository *Repository) Update(
+	ctx context.Context,
+	formID int64,
+	ownerID int64,
+	title string,
+	slug string,
+	description *string,
+	fields []FieldDefinition,
+) (Summary, error) {
+	tx, err := repository.database.Begin(ctx)
+	if err != nil {
+		return Summary{}, fmt.Errorf("begin form update transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var form Summary
+	err = tx.QueryRow(ctx, `
+		UPDATE forms
+		SET title = $3, slug = $4, description = $5, updated_by = $2, updated_at = NOW()
+		WHERE id = $1 AND owner_id = $2 AND state = 'DRAFT' AND deleted_at IS NULL
+		RETURNING id, title, slug, description, state::text, created_at, updated_at
+	`, formID, ownerID, title, slug, description).Scan(
+		&form.ID, &form.Title, &form.Slug, &form.Description,
+		&form.State, &form.CreatedAt, &form.UpdatedAt,
+	)
+	if err != nil {
+		var databaseError *pgconn.PgError
+		if errors.As(err, &databaseError) && databaseError.Code == "23505" {
+			return Summary{}, ErrSlugAlreadyExists
+		}
+		if errors.Is(err, pgx.ErrNoRows) {
+			var state string
+			stateErr := tx.QueryRow(ctx, `SELECT state::text FROM forms WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL`, formID, ownerID).Scan(&state)
+			if stateErr == nil && state != "DRAFT" {
+				return Summary{}, ErrInvalidFormState
+			}
+			return Summary{}, ErrFormNotFound
+		}
+		return Summary{}, fmt.Errorf("update form: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM form_fields WHERE form_id = $1`, formID); err != nil {
+		return Summary{}, fmt.Errorf("replace form fields: %w", err)
+	}
+	for position, field := range fields {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO form_fields (form_id, field_type, label, description, required, position, configuration, created_by, updated_by)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+		`, formID, field.Type, field.Label, nullableString(field.Description), field.Required,
+			position, field.Configuration, ownerID); err != nil {
+			return Summary{}, fmt.Errorf("replace form field: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Summary{}, fmt.Errorf("commit form update transaction: %w", err)
+	}
+	return form, nil
+}
+
 func (repository *Repository) FindPublishedBySlug(ctx context.Context, slug string) (PublicForm, error) {
 	var form PublicForm
 	err := repository.database.QueryRow(ctx, `
@@ -240,6 +315,10 @@ func (repository *Repository) FindPublishedBySlug(ctx context.Context, slug stri
 		return PublicForm{}, fmt.Errorf("find published form: %w", err)
 	}
 
+	return repository.loadFields(ctx, form)
+}
+
+func (repository *Repository) loadFields(ctx context.Context, form PublicForm) (PublicForm, error) {
 	rows, err := repository.database.Query(ctx, `
 		SELECT id, field_type, label, description, required, configuration
 		FROM form_fields

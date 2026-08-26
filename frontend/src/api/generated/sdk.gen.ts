@@ -16,6 +16,9 @@ import type {
   GetAuthSessionData,
   GetAuthSessionErrors,
   GetAuthSessionResponses,
+  GetFormData,
+  GetFormErrors,
+  GetFormResponses,
   GetHealthData,
   GetHealthErrors,
   GetHealthResponses,
@@ -38,6 +41,9 @@ import type {
   RegisterUserData,
   RegisterUserErrors,
   RegisterUserResponses,
+  UpdateFormData,
+  UpdateFormErrors,
+  UpdateFormResponses,
 } from "./types.gen";
 
 export type Options<
@@ -237,6 +243,52 @@ export const createForm = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/admin/forms",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Busca um formulario do usuario autenticado para edicao
+ */
+export const getForm = <ThrowOnError extends boolean = false>(
+  options: Options<GetFormData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<GetFormResponses, GetFormErrors, ThrowOnError>(
+    {
+      security: [
+        {
+          in: "cookie",
+          name: "falqon_session",
+          type: "apiKey",
+        },
+      ],
+      url: "/admin/forms/{formId}",
+      ...options,
+    },
+  );
+
+/**
+ * Atualiza um formulario em rascunho
+ */
+export const updateForm = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateFormData, ThrowOnError>,
+) =>
+  (options.client ?? client).put<
+    UpdateFormResponses,
+    UpdateFormErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        in: "cookie",
+        name: "falqon_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/admin/forms/{formId}",
     ...options,
     headers: {
       "Content-Type": "application/json",

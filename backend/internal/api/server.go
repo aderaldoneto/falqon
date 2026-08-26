@@ -45,6 +45,8 @@ type formRepository interface {
 	Create(context.Context, int64, string, string, *string, []formdomain.FieldDefinition) (formdomain.Summary, error)
 	ListByOwner(context.Context, int64) ([]formdomain.Summary, error)
 	ListPublished(context.Context) ([]formdomain.Summary, error)
+	FindByOwner(context.Context, int64, int64) (formdomain.PublicForm, error)
+	Update(context.Context, int64, int64, string, string, *string, []formdomain.FieldDefinition) (formdomain.Summary, error)
 	Publish(context.Context, int64, int64) (formdomain.Summary, error)
 	FindPublishedBySlug(context.Context, string) (formdomain.PublicForm, error)
 	CreateSubmission(context.Context, int64, []formdomain.Answer) (formdomain.Submission, error)
@@ -73,6 +75,43 @@ func (server *Server) ListPublishedForms(
 
 var formSlugPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 
+func (server *Server) GetForm(ctx context.Context, request GetFormRequestObject) (GetFormResponseObject, error) {
+	if request.Params.FalqonSession == nil {
+		return GetForm401JSONResponse{Code: "unauthenticated", Message: "authentication is required"}, nil
+	}
+	user, err := server.authRepository.UserBySession(ctx, *request.Params.FalqonSession)
+	if errors.Is(err, formauth.ErrUnauthenticated) {
+		return GetForm401JSONResponse{Code: "unauthenticated", Message: "authentication is required"}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	form, err := server.formRepository.FindByOwner(ctx, request.FormId, user.ID)
+	if errors.Is(err, formdomain.ErrFormNotFound) {
+		return GetForm404JSONResponse{Code: "form_not_found", Message: "form was not found"}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	response, err := publicFormResponse(form)
+	if err != nil {
+		return nil, err
+	}
+	return GetForm200JSONResponse(response), nil
+}
+
+func publicFormResponse(form formdomain.PublicForm) (PublicForm, error) {
+	fields := make([]PublicFormField, 0, len(form.Fields))
+	for _, field := range form.Fields {
+		configuration := make(map[string]interface{})
+		if err := json.Unmarshal(field.Configuration, &configuration); err != nil {
+			return PublicForm{}, err
+		}
+		fields = append(fields, PublicFormField{Id: field.ID, Type: FormFieldType(field.Type), Label: field.Label, Description: field.Description, Required: field.Required, Configuration: configuration})
+	}
+	return PublicForm{Id: form.ID, Title: form.Title, Slug: form.Slug, Description: form.Description, Fields: fields}, nil
+}
+
 func (server *Server) GetPublicForm(
 	ctx context.Context,
 	request GetPublicFormRequestObject,
@@ -85,20 +124,11 @@ func (server *Server) GetPublicForm(
 		return nil, err
 	}
 
-	fields := make([]PublicFormField, 0, len(form.Fields))
-	for _, field := range form.Fields {
-		configuration := make(map[string]interface{})
-		if err := json.Unmarshal(field.Configuration, &configuration); err != nil {
-			return nil, err
-		}
-		fields = append(fields, PublicFormField{
-			Id: field.ID, Type: FormFieldType(field.Type), Label: field.Label,
-			Description: field.Description, Required: field.Required, Configuration: configuration,
-		})
+	response, err := publicFormResponse(form)
+	if err != nil {
+		return nil, err
 	}
-	return GetPublicForm200JSONResponse{
-		Id: form.ID, Title: form.Title, Slug: form.Slug, Description: form.Description, Fields: fields,
-	}, nil
+	return GetPublicForm200JSONResponse(response), nil
 }
 
 func (server *Server) CreateSubmission(
@@ -366,6 +396,66 @@ func (server *Server) CreateForm(
 		return nil, err
 	}
 	return CreateForm201JSONResponse(formSummaryResponse(form)), nil
+}
+
+func (server *Server) UpdateForm(ctx context.Context, request UpdateFormRequestObject) (UpdateFormResponseObject, error) {
+	if request.Params.FalqonSession == nil {
+		return UpdateForm401JSONResponse{Code: "unauthenticated", Message: "authentication is required"}, nil
+	}
+	user, err := server.authRepository.UserBySession(ctx, *request.Params.FalqonSession)
+	if errors.Is(err, formauth.ErrUnauthenticated) {
+		return UpdateForm401JSONResponse{Code: "unauthenticated", Message: "authentication is required"}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if request.Body == nil {
+		return UpdateForm422JSONResponse{Code: "invalid_form", Message: "form data is required"}, nil
+	}
+
+	title := strings.TrimSpace(request.Body.Title)
+	slug := strings.TrimSpace(request.Body.Slug)
+	if len(title) < 2 || len(title) > 255 || len(slug) < 2 || len(slug) > 255 ||
+		!formSlugPattern.MatchString(slug) || len(request.Body.Fields) == 0 {
+		return UpdateForm422JSONResponse{Code: "invalid_form", Message: "title, slug, and at least one field are required"}, nil
+	}
+	if request.Body.Description != nil {
+		trimmed := strings.TrimSpace(*request.Body.Description)
+		if len(trimmed) > 2000 {
+			return UpdateForm422JSONResponse{Code: "invalid_form", Message: "description must contain at most 2000 characters"}, nil
+		}
+		request.Body.Description = nullableAPIString(trimmed)
+	}
+	fields := make([]formdomain.FieldDefinition, 0, len(request.Body.Fields))
+	for position, input := range request.Body.Fields {
+		configuration, err := json.Marshal(input.Configuration)
+		if err != nil {
+			return UpdateForm422JSONResponse{Code: "invalid_form", Message: "field configuration is invalid"}, nil
+		}
+		field := formdomain.FieldDefinition{Type: formdomain.FieldType(input.Type), Label: strings.TrimSpace(input.Label), Required: input.Required, Position: position, Configuration: configuration}
+		if input.Description != nil {
+			field.Description = strings.TrimSpace(*input.Description)
+		}
+		if err := field.Validate(); err != nil {
+			return UpdateForm422JSONResponse{Code: "invalid_form", Message: err.Error()}, nil
+		}
+		fields = append(fields, field)
+	}
+
+	form, err := server.formRepository.Update(ctx, request.FormId, user.ID, title, slug, request.Body.Description, fields)
+	if errors.Is(err, formdomain.ErrSlugAlreadyExists) {
+		return UpdateForm409JSONResponse{Code: "slug_already_exists", Message: "slug is already in use"}, nil
+	}
+	if errors.Is(err, formdomain.ErrInvalidFormState) {
+		return UpdateForm409JSONResponse{Code: "invalid_form_state", Message: "only draft forms can be edited"}, nil
+	}
+	if errors.Is(err, formdomain.ErrFormNotFound) {
+		return UpdateForm404JSONResponse{Code: "form_not_found", Message: "form was not found"}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return UpdateForm200JSONResponse(formSummaryResponse(form)), nil
 }
 
 func (server *Server) PublishForm(

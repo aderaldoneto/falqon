@@ -13,9 +13,8 @@ import (
 
 type databaseHealthCheckerStub struct{ err error }
 
-
 func (stub formRepositoryStub) ListPublished(context.Context) ([]formdomain.Summary, error) {
-	return stub.forms, nil
+	return stub.forms, stub.err
 }
 func (stub databaseHealthCheckerStub) Ping(context.Context) error { return stub.err }
 
@@ -76,6 +75,20 @@ func (stub formRepositoryStub) Create(
 
 func (stub formRepositoryStub) ListByOwner(context.Context, int64) ([]formdomain.Summary, error) {
 	return stub.forms, stub.err
+}
+
+func (stub formRepositoryStub) FindByOwner(context.Context, int64, int64) (formdomain.PublicForm, error) {
+	return stub.FindPublishedBySlug(context.Background(), "")
+}
+
+func (stub formRepositoryStub) Update(_ context.Context, _ int64, _ int64, title string, slug string, _ *string, _ []formdomain.FieldDefinition) (formdomain.Summary, error) {
+	if len(stub.forms) == 0 {
+		return formdomain.Summary{}, stub.err
+	}
+	updated := stub.forms[0]
+	updated.Title = title
+	updated.Slug = slug
+	return updated, stub.err
 }
 
 func (stub formRepositoryStub) Publish(context.Context, int64, int64) (formdomain.Summary, error) {
@@ -395,6 +408,42 @@ func TestCreateFormValidatesAndCreatesDraft(t *testing.T) {
 	created, ok := response.(CreateForm201JSONResponse)
 	if !ok || created.Id != 15 || created.State != DRAFT {
 		t.Fatalf("CreateForm() response = %#v, want created draft", response)
+	}
+}
+
+func TestUpdateFormSavesDraft(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	server := newAuthTestServerWithForms(
+		googleAuthenticatorStub{},
+		authRepositoryStub{user: formauth.User{ID: 7}},
+		formRepositoryStub{forms: []formdomain.Summary{{ID: 15, Title: "Original", Slug: "original", State: "DRAFT", CreatedAt: now, UpdatedAt: now}}},
+	)
+	token := "session-token"
+	title := "Updated title"
+	slug := "updated-title"
+
+	response, err := server.UpdateForm(context.Background(), UpdateFormRequestObject{
+		FormId: 15,
+		Params: UpdateFormParams{FalqonSession: &token},
+		Body: &UpdateFormJSONRequestBody{
+			Title: title,
+			Slug:  slug,
+			Fields: []CreateFormField{{
+				Type:          SHORTTEXT,
+				Label:         "Question",
+				Required:      false,
+				Configuration: map[string]interface{}{},
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("UpdateForm() error = %v", err)
+	}
+	updated, ok := response.(UpdateForm200JSONResponse)
+	if !ok || updated.Title != title || updated.Slug != slug {
+		t.Fatalf("UpdateForm() response = %#v, want updated draft", response)
 	}
 }
 

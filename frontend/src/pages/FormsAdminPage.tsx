@@ -207,13 +207,25 @@ export function FormsAdminPage() {
                         Atualizado em {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(new Date(form.updated_at))}
                       </Typography>
                       {form.state === 'DRAFT' && (
-                        <Button
-                          disabled={publishMutation.isPending}
-                          onClick={() => publishMutation.mutate(form.id)}
-                          variant="contained"
-                        >
-                          {publishMutation.isPending ? 'Publicando...' : 'Publicar formulário'}
-                        </Button>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Button
+                            disabled={publishMutation.isPending}
+                            onClick={() => publishMutation.mutate(form.id)}
+                            variant="contained"
+                          >
+                            {publishMutation.isPending ? 'Publicando...' : 'Publicar formulário'}
+                          </Button>
+                          <Button
+                            component={RouterLink}
+                            to={`/admin/forms/${form.id}/edit`}
+                            variant="outlined"
+                            aria-label={`Editar ${form.title}`}
+                            title="Editar formulário"
+                            sx={{ minWidth: 44, px: 1.25, fontSize: 20, lineHeight: 1 }}
+                          >
+                            ✎
+                          </Button>
+                        </Stack>
                       )}
                       {form.state === 'PUBLISHED' && (
                         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>

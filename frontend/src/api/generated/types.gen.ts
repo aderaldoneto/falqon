@@ -418,6 +418,76 @@ export type CreateFormResponses = {
 
 export type CreateFormResponse = CreateFormResponses[keyof CreateFormResponses];
 
+export type GetFormData = {
+  body?: never;
+  path: {
+    formId: number;
+  };
+  query?: never;
+  url: "/admin/forms/{formId}";
+};
+
+export type GetFormErrors = {
+  /**
+   * Sessao ausente ou expirada
+   */
+  401: ErrorResponse;
+  /**
+   * Formulario nao encontrado
+   */
+  404: ErrorResponse;
+};
+
+export type GetFormError = GetFormErrors[keyof GetFormErrors];
+
+export type GetFormResponses = {
+  /**
+   * Formulario para edicao
+   */
+  200: PublicForm;
+};
+
+export type GetFormResponse = GetFormResponses[keyof GetFormResponses];
+
+export type UpdateFormData = {
+  body: CreateFormRequest;
+  path: {
+    formId: number;
+  };
+  query?: never;
+  url: "/admin/forms/{formId}";
+};
+
+export type UpdateFormErrors = {
+  /**
+   * Sessao ausente ou expirada
+   */
+  401: ErrorResponse;
+  /**
+   * Formulario nao encontrado
+   */
+  404: ErrorResponse;
+  /**
+   * Slug ja utilizado ou formulario publicado
+   */
+  409: ErrorResponse;
+  /**
+   * Definicao do formulario invalida
+   */
+  422: ErrorResponse;
+};
+
+export type UpdateFormError = UpdateFormErrors[keyof UpdateFormErrors];
+
+export type UpdateFormResponses = {
+  /**
+   * Formulario atualizado
+   */
+  200: FormSummary;
+};
+
+export type UpdateFormResponse = UpdateFormResponses[keyof UpdateFormResponses];
+
 export type PublishFormData = {
   body?: never;
   path: {

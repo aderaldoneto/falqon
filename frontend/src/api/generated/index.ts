@@ -6,6 +6,7 @@ export {
   createForm,
   createSubmission,
   getAuthSession,
+  getForm,
   getHealth,
   getPublicForm,
   listForms,
@@ -15,6 +16,7 @@ export {
   type Options,
   publishForm,
   registerUser,
+  updateForm,
 } from "./sdk.gen";
 export type {
   AdminFormSubmissions,
@@ -50,6 +52,11 @@ export type {
   GetAuthSessionErrors,
   GetAuthSessionResponse,
   GetAuthSessionResponses,
+  GetFormData,
+  GetFormError,
+  GetFormErrors,
+  GetFormResponse,
+  GetFormResponses,
   GetHealthData,
   GetHealthError,
   GetHealthErrors,
@@ -97,5 +104,10 @@ export type {
   SubmissionAnswer,
   SubmissionCreated,
   TextConfiguration,
+  UpdateFormData,
+  UpdateFormError,
+  UpdateFormErrors,
+  UpdateFormResponse,
+  UpdateFormResponses,
   User,
 } from "./types.gen";

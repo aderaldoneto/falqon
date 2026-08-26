@@ -257,6 +257,16 @@ type CreateFormParams struct {
 	FalqonSession *string `form:"falqon_session,omitempty" json:"falqon_session,omitempty"`
 }
 
+// GetFormParams defines parameters for GetForm.
+type GetFormParams struct {
+	FalqonSession *string `form:"falqon_session,omitempty" json:"falqon_session,omitempty"`
+}
+
+// UpdateFormParams defines parameters for UpdateForm.
+type UpdateFormParams struct {
+	FalqonSession *string `form:"falqon_session,omitempty" json:"falqon_session,omitempty"`
+}
+
 // PublishFormParams defines parameters for PublishForm.
 type PublishFormParams struct {
 	FalqonSession *string `form:"falqon_session,omitempty" json:"falqon_session,omitempty"`
@@ -288,6 +298,9 @@ type GetAuthSessionParams struct {
 // CreateFormJSONRequestBody defines body for CreateForm for application/json ContentType.
 type CreateFormJSONRequestBody = CreateFormRequest
 
+// UpdateFormJSONRequestBody defines body for UpdateForm for application/json ContentType.
+type UpdateFormJSONRequestBody = CreateFormRequest
+
 // RegisterUserJSONRequestBody defines body for RegisterUser for application/json ContentType.
 type RegisterUserJSONRequestBody = RegisterUserRequest
 
@@ -302,6 +315,12 @@ type ServerInterface interface {
 	// CreateForm Cria um formulario dinamico como rascunho
 	// (POST /admin/forms)
 	CreateForm(w http.ResponseWriter, r *http.Request, params CreateFormParams)
+	// GetForm Busca um formulario do usuario autenticado para edicao
+	// (GET /admin/forms/{formId})
+	GetForm(w http.ResponseWriter, r *http.Request, formId int64, params GetFormParams)
+	// UpdateForm Atualiza um formulario em rascunho
+	// (PUT /admin/forms/{formId})
+	UpdateForm(w http.ResponseWriter, r *http.Request, formId int64, params UpdateFormParams)
 	// PublishForm Publica um formulario em rascunho
 	// (POST /admin/forms/{formId}/publish)
 	PublishForm(w http.ResponseWriter, r *http.Request, formId int64, params PublishFormParams)
@@ -350,6 +369,18 @@ func (_ Unimplemented) ListForms(w http.ResponseWriter, r *http.Request, params 
 // CreateForm Cria um formulario dinamico como rascunho
 // (POST /admin/forms)
 func (_ Unimplemented) CreateForm(w http.ResponseWriter, r *http.Request, params CreateFormParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetForm Busca um formulario do usuario autenticado para edicao
+// (GET /admin/forms/{formId})
+func (_ Unimplemented) GetForm(w http.ResponseWriter, r *http.Request, formId int64, params GetFormParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateForm Atualiza um formulario em rascunho
+// (PUT /admin/forms/{formId})
+func (_ Unimplemented) UpdateForm(w http.ResponseWriter, r *http.Request, formId int64, params UpdateFormParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -489,6 +520,94 @@ func (siw *ServerInterfaceWrapper) CreateForm(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateForm(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetForm operation middleware
+func (siw *ServerInterfaceWrapper) GetForm(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "formId" -------------
+	var formId int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "formId", chi.URLParam(r, "formId"), &formId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "formId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetFormParams
+
+	{
+		var cookie *http.Cookie
+
+		if cookie, err = r.Cookie("falqon_session"); err == nil {
+			var value string
+			err = runtime.BindStyledParameterWithOptions("simple", "falqon_session", cookie.Value, &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationCookie, Explode: true, Required: false, Type: "string", Format: ""})
+			if err != nil {
+				siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "falqon_session", Err: err})
+				return
+			}
+			params.FalqonSession = &value
+
+		}
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetForm(w, r, formId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateForm operation middleware
+func (siw *ServerInterfaceWrapper) UpdateForm(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "formId" -------------
+	var formId int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "formId", chi.URLParam(r, "formId"), &formId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "formId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateFormParams
+
+	{
+		var cookie *http.Cookie
+
+		if cookie, err = r.Cookie("falqon_session"); err == nil {
+			var value string
+			err = runtime.BindStyledParameterWithOptions("simple", "falqon_session", cookie.Value, &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationCookie, Explode: true, Required: false, Type: "string", Format: ""})
+			if err != nil {
+				siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "falqon_session", Err: err})
+				return
+			}
+			params.FalqonSession = &value
+
+		}
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateForm(w, r, formId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -985,6 +1104,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/admin/forms", wrapper.CreateForm)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/admin/forms/{formId}", wrapper.GetForm)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/admin/forms/{formId}", wrapper.UpdateForm)
+	})
+	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/admin/forms/{formId}/publish", wrapper.PublishForm)
 	})
 	r.Group(func(r chi.Router) {
@@ -1084,6 +1209,137 @@ func (response CreateForm409JSONResponse) VisitCreateFormResponse(w http.Respons
 type CreateForm422JSONResponse ErrorResponse
 
 func (response CreateForm422JSONResponse) VisitCreateFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFormRequestObject struct {
+	FormId int64 `json:"formId"`
+	Params GetFormParams
+}
+
+type GetFormResponseObject interface {
+	VisitGetFormResponse(w http.ResponseWriter) error
+}
+
+type GetForm200JSONResponse PublicForm
+
+func (response GetForm200JSONResponse) VisitGetFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetForm401JSONResponse ErrorResponse
+
+func (response GetForm401JSONResponse) VisitGetFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetForm404JSONResponse ErrorResponse
+
+func (response GetForm404JSONResponse) VisitGetFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateFormRequestObject struct {
+	FormId int64 `json:"formId"`
+	Params UpdateFormParams
+	Body   *UpdateFormJSONRequestBody
+}
+
+type UpdateFormResponseObject interface {
+	VisitUpdateFormResponse(w http.ResponseWriter) error
+}
+
+type UpdateForm200JSONResponse FormSummary
+
+func (response UpdateForm200JSONResponse) VisitUpdateFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateForm401JSONResponse ErrorResponse
+
+func (response UpdateForm401JSONResponse) VisitUpdateFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateForm404JSONResponse ErrorResponse
+
+func (response UpdateForm404JSONResponse) VisitUpdateFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateForm409JSONResponse ErrorResponse
+
+func (response UpdateForm409JSONResponse) VisitUpdateFormResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateForm422JSONResponse ErrorResponse
+
+func (response UpdateForm422JSONResponse) VisitUpdateFormResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1553,6 +1809,12 @@ type StrictServerInterface interface {
 	// CreateForm Cria um formulario dinamico como rascunho
 	// (POST /admin/forms)
 	CreateForm(ctx context.Context, request CreateFormRequestObject) (CreateFormResponseObject, error)
+	// GetForm Busca um formulario do usuario autenticado para edicao
+	// (GET /admin/forms/{formId})
+	GetForm(ctx context.Context, request GetFormRequestObject) (GetFormResponseObject, error)
+	// UpdateForm Atualiza um formulario em rascunho
+	// (PUT /admin/forms/{formId})
+	UpdateForm(ctx context.Context, request UpdateFormRequestObject) (UpdateFormResponseObject, error)
 	// PublishForm Publica um formulario em rascunho
 	// (POST /admin/forms/{formId}/publish)
 	PublishForm(ctx context.Context, request PublishFormRequestObject) (PublishFormResponseObject, error)
@@ -1679,6 +1941,67 @@ func (sh *strictHandler) CreateForm(w http.ResponseWriter, r *http.Request, para
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateFormResponseObject); ok {
 		if err := validResponse.VisitCreateFormResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetForm operation middleware
+func (sh *strictHandler) GetForm(w http.ResponseWriter, r *http.Request, formId int64, params GetFormParams) {
+	var request GetFormRequestObject
+
+	request.FormId = formId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetForm(ctx, request.(GetFormRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetForm")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFormResponseObject); ok {
+		if err := validResponse.VisitGetFormResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateForm operation middleware
+func (sh *strictHandler) UpdateForm(w http.ResponseWriter, r *http.Request, formId int64, params UpdateFormParams) {
+	var request UpdateFormRequestObject
+
+	request.FormId = formId
+	request.Params = params
+
+	var body UpdateFormJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateForm(ctx, request.(UpdateFormRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateForm")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateFormResponseObject); ok {
+		if err := validResponse.VisitUpdateFormResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1985,45 +2308,47 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"7FvrUhs5Fn4VlXZ+7KWJjUlmMv6zRRxDXOsQCsPWVqVYSnQfbCXdUkdSExjKD7PPsi82JanvltttA45T",
+	"xS9MW5dz+c45n47aD9jnUcwZMCVx/wFLfwYRMR8Pg4iyIy6iSXIdUSkpZ+Y5CQKqKGckPBU8BqEoSNy/",
+	"IaEED8elRw/4hovoigbZR6JwH1Omfn2NPazuY7D/whQEnntYhslUD02/kUpQNjVfVAWgCiLz4RcBN7iP",
+	"/9IpdOikCnSM9IXkepl0XSIEuTf/UxWCY8O5hwV8S6iAAPc/50pkE1JBq2Jd5svz6y/gK71+XYT1bEeY",
+	"/A5iY4UPzXSX2r4AoiC40t4o+SUgCvYUjaDwTeGBlj6sWc4YrbSdlyvVwlypAmsCjkIYtEecHW6fN1tX",
+	"x8GRHn2uB889HJJrCJ1ovSVhotdbwFEmW2XfbKVsnssygxmnPqxpilzAiLIxsKma4f6+t1zc5nE1Xeyk",
+	"THanzMbtudnWFN7n7IZOE0FUY+AokYBj7wCkL2iczY3IXa5Yt9t12KCwVTG09+aNt8p2hUlyHFxzHgIp",
+	"5Zu1cFUzcw0h+VdezUDNDjiDbwlItaYLlhux5zaiAXX7fFUHyNxYe2Sn7i+mraw6NLio5+GYKAWC4T7+",
+	"72ey90d37/fLf/z1n/29/J+//f0XV4LLa0Hz8s1RUasPqUGWO6dIdpu5aN0Ssbo61BRqStdDIbg4Axlz",
+	"JmHt8A7AmTsjkJJMWxRls0Ix3iVgNbT6DxhYEum5kw+fzs6vzof/OcceHn86Oc4+n1x8fDc8wx6ejE6O",
+	"x8OrwYdPo8EQe/jjxfh8dFp+cnZ4Pjo5Lu1b6GAokyKqsuf7s8MjvcXpxbvxaPJh+B57eHB4MhiOh++X",
+	"r5JEERH36xp3g/peC/ZN638Th8sssiobWtM10DMPJ3GwpoYuYlJnc2bfGl8p7eSC2AcgoZptGAR6w0SW",
+	"QcK/OqBQEz2d5ZLmYxIqGodg6cKgXQl1Q8issEYutwSlksJ7iyk8IndXEkLwVUblI8popJXfd4EpomzZ",
+	"+O5K8pnp4LLUSRJdg3iMhSJyV4ImM+ulIjufSwWxcfWdHyaS3sLHTBPLYRyKZZPnDgVOk+uQ+jpcHlfV",
+	"H1vECznyIl53+uNTR8tzmiuoG0pwXfQfSFA3T7fLTyHPTU2ttR/BT8+Iomz6BDEYkbs0h3RLcdRbklBW",
+	"ZZ2amnqGSVxuHWBKpQJxIUFsRuEgIjSsONs+8cpE9KDn4tuMRHXGuv9rdwVj1QxZyu9cBLWpv/UqM9+u",
+	"qkNmdy+XNl/VZaYJZdOdLUtrlI3tNida9BGWtwwKUe1RI9gCiXyaJpFLm3O4U4/MFFdhiuw2pMMx1k04",
+	"FiTVmeDJUsDmdSHLDS0qZiWQF42vCzP4iaDqfqLDKit//CuFw8QaSWfV9FG2YB/fkPAb1/zNNj+LsIvp",
+	"v0DHndaH3fAFVoIPT0coJoIgX1AiPBSbSk0EAiQM1Q5AIG2EJCSCcokCykhEfS5f5Qygj4/M/mgPTSBB",
+	"UqfpiKBAL3FL4btEgAj7//9CKkHqSAJhe7S4+2r/VVfbkMfASExxHx+86r46MElOzYz6HRJElHW0DOb/",
+	"KZgw0V418BwFuI/HVKojM0LPFCQCZQ7rn9sazKYxlxsvtR/tocPs3+t2U1KigNkSFMfaZlqYzhdpA6ZY",
+	"r1X2LJ9AFxsFdRZjDqy5QzhKZKI/65mvu/trSdckVLXr4BBjAlISjkgigSlAPEFwF1NBAlLBsnFDGcWf",
+	"L7VVZXbiNt4jiMsq0HK9EEm0MtQnAdegI1PtWWz9fanLLJcOTBRNr2cCheEg73hw/2QWX+wjzqt5RHPc",
+	"+QIgn87lFRw24c7ki2C3IKdF+X2LooTJFH0hKFE0pH9kxuj1tifBe7ihjPqE62ApYgdRdktCum4UDgQl",
+	"KInKC2XJHvk84kgQ6Sds5orBuVfJ050H/WcUzJcm7GNQDZGpk38pLs1auB4H5fhsQYR+fCVod7hfEXem",
+	"WEOgvb5zwfd6e6KULMIIR8D0tsIE4TqYf5dIfwH0zsJTMbyzCCUOmF+YnubPifSdKW/dH1DeiEpIKau/",
+	"RFk9yn50sdV2KQVtem756YvwYYq7Wk6CaJPq2zFWkebc6ObIp3bASyneKElUQfeSI35wjhhKpRODSd1G",
+	"lhhERBVkfjKUaZ1gtKTsiWKx9mJdYxuj/BbgS1iW3rmrG8eBAoMQqYis5uOXEH00WbZtGiJtZ9CaGFqR",
+	"52VxkqhZZ8r51F45OkPiHUwpOzZjxnxqbogqEDvo/rbY1TyDgArwKWfE8naO7BLYwzMgQfoiz5j7eYe7",
+	"ReQkgjrfdpiA2hvYoGlcqD5Tz33TPdgeDg4zj2i2Yg1iAJFfIGZsJXf5iFGfavOF2vbI51FhyMyjGix2",
+	"WXv/WHdtxydheE38r0t9POBRHIKCqptdae9bAuK+SE3pm0nLTey552Xvn6w9EbSJW01ckkW5NsxaOfSg",
+	"22sGeADolocqR/qNMGAKdg7rr5+wGqzE+iAFXcbDeQ3ZR5RZor0htkM+5fbE72bWY/v9Fq4jXi/CI609",
+	"wHwQJqorUNjch+tUi6HdHBEk00qoeVkr24r0qn+5dcsvA+DnaVa43jfYcjfeaOfA9kVaYX0SEGkKOYJa",
+	"uX0Sd2+bv+9FhIb6lF8otv3jPAm44TWpDPlBnstaBhmkQmoGlHEenUTAqgGI2uIpkywEWoE/SwINnXM9",
+	"eZLnih2779wE0DlXziBMftq7zDNQXDBdVpp5sBMAqy+504YNBNlt907fTecNknrsOG98i9EooForegtU",
+	"WlqTHzmWHCXSw7YMk2njpVPpnqXNwTp9tbF90tyNOyIzkO/OOVOHk2nIFA2z+aprmHwsiiHkKPXEKt/X",
+	"2yxNrwaUfi74fFh4rluUxd+zbJmcLL711tiMkSS8JXKnIbllplHYJrsqqGfJf5unCKzxmtouhRbuEJmZ",
+	"H080JUb78wr8jOmr9gMOV3/idIQAXRPmc61iUC8FeOsNk9MRoiyXINSgkRAh4oOUHBFuha0TQ85kog/k",
+	"BEmSGEXQ4emo5JrJvVQQad8YaiFus7RT2z66poaNhNw3R6dEhLiPZ0rF/U7HPJxxqfpvu2+7WKebdP0H",
+	"d2Pc+Nz0DMJCpDS5pRLNvYemnhHkZ7kgooxq9qvoLSmWqbGaxeWOQQDzKYmAqdoyxuclPlCsapE8v5z/",
+	"GQAA//8=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
